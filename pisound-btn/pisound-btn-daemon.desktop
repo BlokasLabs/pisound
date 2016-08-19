@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=pisound button daemon autostart
+Comment=Monitor the interrupts signalled by the button and launch scripts.
+NoDisplay=true
+Exec=sh -c "pisound-btn >> ~/.pisound.log"
+NotShowIn=GNOME;KDE;XFCE;
