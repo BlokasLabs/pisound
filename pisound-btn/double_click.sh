@@ -20,14 +20,27 @@
 
 . $(dirname $(readlink -f $0))/common.sh
 
-log "pisound button held!"
+log "pisound button double clicked!"
 aconnect -x
+flash_out_led 1
 
-for i in $(seq 1 10); do
-	flash_out_led 1
-	sleep 0.1
+log "Killing all Pure Data instances!"
+
+for pd in `ps -C puredata --no-headers | awk '{print $1;}'`; do
+	log "Killing pid $pd..."
+	kill $pd
 done
 
-log "Shutting down."
+log "Syncing IO!"
+sync
 
-sudo shutdown now
+log "Unmounting all usb drives!"
+for usb_dev in /dev/disk/by-id/usb-*; do
+	dev=$(readlink -f $usb_dev)
+	grep -q ^$dev /proc/mounts && sudo umount $dev
+done
+
+log "Done, flashing led."
+flash_out_led 10
+sleep 0.5
+flash_out_led 10

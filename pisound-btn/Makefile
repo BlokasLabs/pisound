@@ -18,6 +18,7 @@
 
 BINARY_DIR ?= /usr/local/bin
 SCRIPTS_DIR ?= /usr/local/etc/pisound
+PATCHES_DIR ?= /usr/local/etc/pisound-patches
 BACKUP_DIR := $(shell echo $(SCRIPTS_DIR)/backups/`date +"%F.%T"`)
 
 all: pisound-btn
@@ -30,6 +31,18 @@ backup-scripts:
 	@mkdir -p $(BACKUP_DIR)
 	@if test -e $(SCRIPTS_DIR)/click.sh; then \
 		cp -pR $(SCRIPTS_DIR)/click.sh $(BACKUP_DIR)/; \
+	fi
+	@if test -e $(SCRIPTS_DIR)/single_click.sh; then \
+		cp -pR $(SCRIPTS_DIR)/single_click.sh $(BACKUP_DIR)/; \
+	fi
+	@if test -e $(SCRIPTS_DIR)/double_click.sh; then \
+		cp -pR $(SCRIPTS_DIR)/double_click.sh $(BACKUP_DIR)/; \
+	fi
+	@if test -e $(SCRIPTS_DIR)/down.sh; then \
+		cp -pR $(SCRIPTS_DIR)/down.sh $(BACKUP_DIR)/; \
+	fi
+	@if test -e $(SCRIPTS_DIR)/up.sh; then \
+		cp -pR $(SCRIPTS_DIR)/up.sh $(BACKUP_DIR)/; \
 	fi
 	@if test -e $(SCRIPTS_DIR)/hold.sh; then \
 		cp -pR $(SCRIPTS_DIR)/hold.sh $(BACKUP_DIR)/; \
@@ -45,7 +58,12 @@ install: all backup-scripts
 	fi
 	@killall pisound-btn 2>/dev/null || true
 	@cp pisound-btn $(BINARY_DIR)/
-	@cp -p click.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/click.sh
+	@mkdir -p $(PATCHES_DIR)
+	@chmod 777 $(PATCHES_DIR)
+	@cp -p single_click.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/single_click.sh
+	@cp -p double_click.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/double_click.sh
+	@cp -p up.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/up.sh
+	@cp -p down.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/down.sh
 	@cp -p hold.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/hold.sh
 	@cp -p common.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/common.sh
 	@cp -p pisound-btn-daemon.desktop /etc/xdg/autostart/

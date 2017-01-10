@@ -18,8 +18,11 @@
  */
 
 #include <stdio.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <sys/stat.h>
+#include <sys/timerfd.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
@@ -29,13 +32,20 @@
 
 #define HOMEPAGE_URL "http://blokas.io/pisound"
 
-enum { PISOUND_BTN_VERSION   = 0x0100 };
-enum { INVALID_VERSION       = 0xffff };
-enum { BUTTON_PIN            = 17     };
-enum { HOLD_PRESS_TIMEOUT_MS = 1000   };
+enum { PISOUND_BTN_VERSION     = 0x0101 };
+enum { INVALID_VERSION         = 0xffff };
+enum { BUTTON_PIN              = 17     };
+enum { DOUBLE_CLICK_TIMEOUT_MS = 500    };
+enum { HOLD_PRESS_TIMEOUT_MS   = DOUBLE_CLICK_TIMEOUT_MS };
 
-static const char *const CLICKED_ACTION       = "/usr/local/etc/pisound/click.sh";
-static const char *const HOLD_ACTION          = "/usr/local/etc/pisound/hold.sh";
+#define SCRIPTS_DIR "/usr/local/etc/pisound"
+
+static const char *const DOWN_ACTION          = SCRIPTS_DIR "/down.sh";         // Executed every time the button is pushed down.
+static const char *const UP_ACTION            = SCRIPTS_DIR "/up.sh";           // Executed every time the button is released up.
+static const char *const SINGLE_CLICK_ACTION  = SCRIPTS_DIR "/single_click.sh"; // Executed if the button was clicked and released once in timeout.
+static const char *const DOUBLE_CLICK_ACTION  = SCRIPTS_DIR "/double_click.sh"; // Executed if the button was double clicked within given timeout.
+static const char *const HOLD_ACTION          = SCRIPTS_DIR "/hold.sh";         // Executed if the button was held for given time.
+
 static const char *const PISOUND_VERSION_FILE = "/sys/kernel/pisound/version";
 
 int gpio_is_pin_valid(int pin)
@@ -66,7 +76,7 @@ int gpio_set_edge(int pin, enum edge_e edge)
 	int fd = open(gpio, O_WRONLY);
 	if (fd == -1)
 	{
-		fprintf(stderr, "Failed to open %s! Error %d\n", gpio, errno);
+		fprintf(stderr, "Failed to open %s! Error %d.\n", gpio, errno);
 		return -1;
 	}
 
@@ -83,14 +93,14 @@ int gpio_set_edge(int pin, enum edge_e edge)
 	int result = write(fd, edge2str[edge], n);
 	if (result != n)
 	{
-		fprintf(stderr, "Failed writing to %s! Error %d\n", gpio, errno);
+		fprintf(stderr, "Failed writing to %s! Error %d.\n", gpio, errno);
 		close(fd);
 		return -1;
 	}
 	int err = close(fd);
 	if (err != 0)
 	{
-		fprintf(stderr, "Failed closing %s! Error %d\n", gpio, errno);
+		fprintf(stderr, "Failed closing %s! Error %d.\n", gpio, errno);
 		return -1;
 	}
 	return 0;
@@ -112,7 +122,7 @@ int gpio_open(int pin)
 
 	if (fd == -1)
 	{
-		fprintf(stderr, "Failed opening %s! Error %d\n", gpio, errno);
+		fprintf(stderr, "Failed opening %s! Error %d.\n", gpio, errno);
 	}
 
 	return fd;
@@ -123,7 +133,7 @@ int gpio_close(int fd)
 	int err = close(fd);
 	if (err != 0)
 	{
-		fprintf(stderr, "Failed closing descriptor %d! Error %d\n", fd, err);
+		fprintf(stderr, "Failed closing descriptor %d! Error %d.\n", fd, err);
 		return -1;
 	}
 	return 0;
@@ -151,7 +161,7 @@ unsigned short get_kernel_module_version(void)
 	fclose(f);
 
 	if (n == 2)
-		return (major & 0xff) << 8 + (minor & 0xff);
+		return ((major & 0xff) << 8) + (minor & 0xff);
 
 	return INVALID_VERSION;
 }
@@ -176,18 +186,41 @@ int run(void)
 	if (err != 0)
 		return err;
 
-	int fd = gpio_open(BUTTON_PIN);
+	enum
+	{
+		FD_BUTTON = 0,
+		FD_TIMER  = 1,
+		FD_COUNT
+	};
 
-	struct pollfd pfd[1];
+	int btnfd = gpio_open(BUTTON_PIN);
+	if (btnfd == -1)
+		return errno;
 
-	pfd[0].fd = fd;
-	pfd[0].events = POLLPRI;
+	int timerfd = timerfd_create(CLOCK_MONOTONIC, 0);
+	if (timerfd == -1)
+	{
+		fprintf(stderr, "Creating timer failed. Error %d.\n", errno);
+		gpio_close(btnfd);
+		return errno;
+	}
+
+	struct pollfd pfd[FD_COUNT];
+
+	pfd[FD_BUTTON].fd = btnfd;
+	pfd[FD_BUTTON].events = POLLPRI;
+
+	pfd[FD_TIMER].fd = timerfd;
+	pfd[FD_TIMER].events = POLLIN;
 
 	timestamp_ms_t pressed_at = 0;
 
+	bool timer_running = false;
+	bool button_down = false;
+
 	for (;;)
 	{
-		int result = poll(pfd, 1, -1);
+		int result = poll(pfd, FD_COUNT, -1);
 
 		if (result == -1)
 			break;
@@ -195,22 +228,22 @@ int run(void)
 		if (result == 0)
 			continue;
 
-		if (pfd[0].revents & POLLPRI)
+		if (pfd[FD_BUTTON].revents & POLLPRI) // Button state changed.
 		{
 			timestamp_ms_t timestamp = get_timestamp_ms();
 
 			char buff[16];
 			memset(buff, 0, sizeof(buff));
-			int n = read(fd, buff, sizeof(buff));
+			int n = read(btnfd, buff, sizeof(buff));
 			if (n == 0)
 			{
-				fprintf(stderr, "Reading value returned 0\n");
+				fprintf(stderr, "Reading button value returned 0.\n");
 				break;
 			}
 
-			if (lseek(fd, SEEK_SET, 0) == -1)
+			if (lseek(btnfd, SEEK_SET, 0) == -1)
 			{
-				fprintf(stderr, "Rewinding failed. Error %d\n", errno);
+				fprintf(stderr, "Rewinding button failed. Error %d.\n", errno);
 				break;
 			}
 
@@ -218,24 +251,61 @@ int run(void)
 
 			if (pressed)
 			{
-				pressed_at = timestamp;
-			}
-			else if (pressed_at != 0)
-			{
-				if (timestamp - pressed_at < HOLD_PRESS_TIMEOUT_MS)
+				button_down = true;
+				system(DOWN_ACTION);
+
+				struct itimerspec its;
+				memset(&its, 0, sizeof(its));
+
+				if (!timer_running)
 				{
-					system(CLICKED_ACTION);
+					pressed_at = timestamp;
+					its.it_value.tv_sec = 0;
+					its.it_value.tv_nsec = DOUBLE_CLICK_TIMEOUT_MS * 1000 * 1000;
+					timerfd_settime(timerfd, 0, &its, 0); // Start the timer.
+					timer_running = true;
 				}
 				else
 				{
-					system(HOLD_ACTION);
+					pressed_at = 0;
+					timerfd_settime(timerfd, 0, &its, 0); // Stop the timer.
+					timer_running = false;
+					system(DOUBLE_CLICK_ACTION);
 				}
-				pressed_at = 0;
 			}
+			else if (button_down)
+			{
+				button_down = false;
+				system(UP_ACTION);
+
+				if (pressed_at != 0)
+				{
+					if (timestamp - pressed_at >= HOLD_PRESS_TIMEOUT_MS)
+					{
+						system(HOLD_ACTION);
+					}
+					pressed_at = 0;
+				}
+			}
+
+		}
+		if (pfd[FD_TIMER].revents & POLLIN) // Timer timed out.
+		{
+			uint64_t t;
+			int n = read(timerfd, &t, sizeof(t));
+			if (n != sizeof(t))
+			{
+				fprintf(stderr, "Error %d reading the timer!\n", errno);
+				return errno;
+			}
+			if (!button_down)
+				system(SINGLE_CLICK_ACTION);
+			timer_running = false;
 		}
 	}
 
-	gpio_close(fd);
+	close(timerfd);
+	gpio_close(btnfd);
 
 	gpio_set_edge(BUTTON_PIN, E_NONE);
 	return 0;
@@ -274,7 +344,7 @@ int main(int argc, char **argv)
 		}
 		else
 		{
-			printf("Uknown option '%s'\n", argv[i]);
+			printf("Unknown option '%s'.\n", argv[i]);
 			print_usage();
 			return 0;
 		}

@@ -18,16 +18,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
 
-. $(dirname $(readlink -f $0))/common.sh
+# This event is a bit spammy, and as of now unused. Feel free to customize.
 
-log "pisound button held!"
-aconnect -x
-
-for i in $(seq 1 10); do
-	flash_out_led 1
-	sleep 0.1
-done
-
-log "Shutting down."
-
-sudo shutdown now
+#. $(dirname $(readlink -f $0))/common.sh
+#log "pisound button up!"

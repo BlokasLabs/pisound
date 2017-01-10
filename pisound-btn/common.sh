@@ -27,10 +27,16 @@ PISOUND_MIDI_DEVICE=`amidi -l | grep pisound | egrep -o hw:[0-9]+,[0-9]+`
 if [ -z $PISOUND_MIDI_DEVICE ]; then
 	log "pisound MIDI device not found!"
 	exit 0
-else
-	log "pisound MIDI device: $PISOUND_MIDI_DEVICE"
+#else
+#	log "pisound MIDI device: $PISOUND_MIDI_DEVICE"
 fi
 
+PISOUND_LED_FILE="/sys/kernel/pisound/led"
+
 flash_out_led() {
-	amidi -S "f0 f7" -p $PISOUND_MIDI_DEVICE 2> /dev/null;
+	if [ -e $PISOUND_LED_FILE ]; then
+		sudo sh -c "echo $1 > $PISOUND_LED_FILE"
+	else
+		amidi -S "f0 f7" -p $PISOUND_MIDI_DEVICE 2> /dev/null
+	fi
 }
