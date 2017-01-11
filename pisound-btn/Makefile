@@ -56,7 +56,7 @@ install: all backup-scripts
 		update-rc.d pisound-btn remove; \
 		/etc/init.d/pisound-btn stop; \
 	fi
-	@killall pisound-btn 2>/dev/null || true
+	@killall -PIPE pisound-btn > /dev/null 2>&1 || true
 	@cp pisound-btn $(BINARY_DIR)/
 	@mkdir -p $(PATCHES_DIR)
 	@chmod 777 $(PATCHES_DIR)
