@@ -30,7 +30,8 @@ PURE_DATA=`which puredata`
 
 if [ -z $PURE_DATA ]; then
 	log "Pure Data was not found! Install by running: sudo apt-get install puredata"
-	exit 0
+	flash_out_led 100
+	exit 1
 fi
 
 log "Searching for main.pd in USB storage!"
@@ -90,6 +91,7 @@ if [ $? -eq 0 ]; then
 	log "Pure Data started successfully!"
 else
 	log "Pure Data failed to start!"
+	flash_out_led 100
 	exit 1
 fi
 
