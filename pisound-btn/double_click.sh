@@ -22,7 +22,7 @@
 
 log "pisound button double clicked!"
 aconnect -x
-flash_out_led 1
+flash_leds 1
 
 log "Killing all Pure Data instances!"
 
@@ -41,6 +41,6 @@ for usb_dev in /dev/disk/by-id/usb-*; do
 done
 
 log "Done, flashing led."
-flash_out_led 10
+flash_leds 10
 sleep 0.5
-flash_out_led 10
+flash_leds 10

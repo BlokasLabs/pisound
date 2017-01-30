@@ -50,6 +50,21 @@ backup-scripts:
 	@if test -e $(SCRIPTS_DIR)/common.sh; then \
 		cp -pR $(SCRIPTS_DIR)/common.sh $(BACKUP_DIR)/; \
 	fi
+	@if test -e $(SCRIPTS_DIR)/tripple_click.sh; then \
+		cp -pR $(SCRIPTS_DIR)/tripple_click.sh $(BACKUP_DIR)/; \
+	fi
+	@if test -e $(SCRIPTS_DIR)/enable_access_point.sh; then \
+		cp -pR $(SCRIPTS_DIR)/enable_access_point.sh $(BACKUP_DIR)/; \
+	fi
+	@if test -e $(SCRIPTS_DIR)/disable_access_point.sh; then \
+		cp -pR $(SCRIPTS_DIR)/disable_access_point.sh $(BACKUP_DIR)/; \
+	fi
+	@if test -e $(SCRIPTS_DIR)/hostapd.conf; then \
+		cp -pR $(SCRIPTS_DIR)/hostapd.conf $(BACKUP_DIR)/; \
+	fi
+	@if test -e $(SCRIPTS_DIR)/dnsmasq.conf; then \
+		cp -pR $(SCRIPTS_DIR)/dnsmasq.conf $(BACKUP_DIR)/; \
+	fi
 
 install: all backup-scripts
 	@if test -e /etc/init.d/pisound-btn; then \
@@ -62,10 +77,15 @@ install: all backup-scripts
 	@chmod 777 $(PATCHES_DIR)
 	@cp -p single_click.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/single_click.sh
 	@cp -p double_click.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/double_click.sh
+	@cp -p tripple_click.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/tripple_click.sh
 	@cp -p up.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/up.sh
 	@cp -p down.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/down.sh
 	@cp -p hold.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/hold.sh
 	@cp -p common.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/common.sh
+	@cp -p enable_access_point.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/enable_access_point.sh
+	@cp -p disable_access_point.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/disable_access_point.sh
+	@cp -p dnsmasq.conf $(SCRIPTS_DIR)/
+	@cp -p hostapd.conf $(SCRIPTS_DIR)/
 	@cp -p pisound-btn-daemon.desktop /etc/xdg/autostart/
 
 clean:

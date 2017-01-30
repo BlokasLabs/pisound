@@ -18,7 +18,23 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
 
-# This event is a bit spammy, and as of now unused. Feel free to customize.
+SCRIPT_PATH=$(dirname $(readlink -f $0))
 
-#. $(dirname $(readlink -f $0))/common.sh
-#log "pisound button up!"
+. $SCRIPT_PATH/common.sh
+
+log "pisound button tripple clicked!"
+flash_leds 1
+
+if ps -e | grep -q hostapd; then
+	log "Disabling Access point..."
+	sh $SCRIPT_PATH/disable_access_point.sh
+
+	flash_leds 20
+	sleep 0.5
+	flash_leds 20
+else
+	log "Enabling Access point..."
+	sh $SCRIPT_PATH/enable_access_point.sh
+
+	flash_leds 20
+fi

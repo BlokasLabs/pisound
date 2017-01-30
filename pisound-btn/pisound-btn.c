@@ -35,8 +35,9 @@
 enum { PISOUND_BTN_VERSION     = 0x0101 };
 enum { INVALID_VERSION         = 0xffff };
 enum { BUTTON_PIN              = 17     };
-enum { DOUBLE_CLICK_TIMEOUT_MS = 500    };
-enum { HOLD_PRESS_TIMEOUT_MS   = DOUBLE_CLICK_TIMEOUT_MS };
+enum { CLICK_TIMEOUT_MS        = 300    };
+enum { HOLD_PRESS_TIMEOUT_MS   = CLICK_TIMEOUT_MS };
+enum { PRESS_COUNT_LIMIT       = 3      };
 
 #define SCRIPTS_DIR "/usr/local/etc/pisound"
 
@@ -44,6 +45,7 @@ static const char *const DOWN_ACTION          = SCRIPTS_DIR "/down.sh";         
 static const char *const UP_ACTION            = SCRIPTS_DIR "/up.sh";           // Executed every time the button is released up.
 static const char *const SINGLE_CLICK_ACTION  = SCRIPTS_DIR "/single_click.sh"; // Executed if the button was clicked and released once in timeout.
 static const char *const DOUBLE_CLICK_ACTION  = SCRIPTS_DIR "/double_click.sh"; // Executed if the button was double clicked within given timeout.
+static const char *const TRIPPLE_CLICK_ACTION = SCRIPTS_DIR "/tripple_click.sh";// Executed if the button was tripple clicke within given timeout.
 static const char *const HOLD_ACTION          = SCRIPTS_DIR "/hold.sh";         // Executed if the button was held for given time.
 
 static const char *const PISOUND_VERSION_FILE = "/sys/kernel/pisound/version";
@@ -166,6 +168,42 @@ unsigned short get_kernel_module_version(void)
 	return INVALID_VERSION;
 }
 
+static void onTimesClicked(unsigned num_presses)
+{
+	switch (num_presses)
+	{
+	case 1:
+		system(SINGLE_CLICK_ACTION);
+		break;
+	case 2:
+		system(DOUBLE_CLICK_ACTION);
+		break;
+	case 3:
+		system(TRIPPLE_CLICK_ACTION);
+		break;
+	default:
+		fprintf(stderr, "onTimesClicked(%u) called, unexpected!\n", num_presses);
+		return;
+	}
+}
+
+static void onDown(void)
+{
+	system(DOWN_ACTION);
+}
+
+static void onUp(void)
+{
+	system(UP_ACTION);
+}
+
+static void onHold(unsigned num_presses)
+{
+	char cmd[64];
+	sprintf(cmd, "%s %u", HOLD_ACTION, num_presses);
+	system(cmd);
+}
+
 int run(void)
 {
 	unsigned short version = get_kernel_module_version();
@@ -217,6 +255,7 @@ int run(void)
 
 	bool timer_running = false;
 	bool button_down = false;
+	unsigned num_pressed = 0;
 
 	for (;;)
 	{
@@ -252,39 +291,39 @@ int run(void)
 			if (pressed)
 			{
 				button_down = true;
-				system(DOWN_ACTION);
-
-				struct itimerspec its;
-				memset(&its, 0, sizeof(its));
+				onDown();
 
 				if (!timer_running)
 				{
-					pressed_at = timestamp;
-					its.it_value.tv_sec = 0;
-					its.it_value.tv_nsec = DOUBLE_CLICK_TIMEOUT_MS * 1000 * 1000;
-					timerfd_settime(timerfd, 0, &its, 0); // Start the timer.
+					num_pressed = 1;
 					timer_running = true;
 				}
 				else
 				{
-					pressed_at = 0;
-					timerfd_settime(timerfd, 0, &its, 0); // Stop the timer.
-					timer_running = false;
-					system(DOUBLE_CLICK_ACTION);
+					if (num_pressed < PRESS_COUNT_LIMIT)
+						++num_pressed;
 				}
+
+				pressed_at = timestamp;
+
+				struct itimerspec its;
+				memset(&its, 0, sizeof(its));
+
+				its.it_value.tv_sec = 0;
+				its.it_value.tv_nsec = CLICK_TIMEOUT_MS * 1000 * 1000;
+				timerfd_settime(timerfd, 0, &its, 0); // Start the timer.
 			}
 			else if (button_down)
 			{
 				button_down = false;
-				system(UP_ACTION);
+				onUp();
 
 				if (pressed_at != 0)
 				{
 					if (timestamp - pressed_at >= HOLD_PRESS_TIMEOUT_MS)
 					{
-						system(HOLD_ACTION);
+						onHold(num_pressed);
 					}
-					pressed_at = 0;
 				}
 			}
 
@@ -299,7 +338,7 @@ int run(void)
 				return errno;
 			}
 			if (!button_down)
-				system(SINGLE_CLICK_ACTION);
+				onTimesClicked(num_pressed);
 			timer_running = false;
 		}
 	}

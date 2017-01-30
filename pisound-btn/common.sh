@@ -33,7 +33,8 @@ fi
 
 PISOUND_LED_FILE="/sys/kernel/pisound/led"
 
-flash_out_led() {
+# Takes an unsigned integer value, [0;255] for flash duration.
+flash_leds() {
 	if [ -e $PISOUND_LED_FILE ]; then
 		sudo sh -c "echo $1 > $PISOUND_LED_FILE"
 	else

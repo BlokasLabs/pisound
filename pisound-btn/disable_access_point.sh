@@ -18,7 +18,11 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
 
-# This event is a bit spammy, and as of now unused. Feel free to customize.
-
-#. $(dirname $(readlink -f $0))/common.sh
-#log "pisound button up!"
+sudo dhcpcd --allowinterfaces wlan0
+sudo killall hostapd
+sudo killall dnsmasq
+sudo ifconfig wlan0 0.0.0.0
+sudo sh -c "echo | iptables-restore"
+sudo sh -c "echo 0 > /proc/sys/net/ipv4/ip_forward"
+sudo iwlist wlan0 scan > /dev/null 2>&1
+sudo ifup wlan0

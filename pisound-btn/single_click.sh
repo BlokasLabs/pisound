@@ -24,13 +24,13 @@ PURE_DATA_STARTUP_SLEEP=3
 
 log "pisound button single clicked!"
 aconnect -x
-flash_out_led 1
+flash_leds 1
 
 PURE_DATA=`which puredata`
 
 if [ -z $PURE_DATA ]; then
 	log "Pure Data was not found! Install by running: sudo apt-get install puredata"
-	flash_out_led 100
+	flash_leds 100
 	exit 1
 fi
 
@@ -69,7 +69,7 @@ fi
 if [ -z "$PURE_DATA_PATCH" ]; then
 	log "No patch found! Doing nothing..."
 	sleep 0.5
-	flash_out_led 100
+	flash_leds 100
 	exit 0
 else
 	log "Found patch: $PURE_DATA_PATCH"
@@ -91,7 +91,7 @@ if [ $? -eq 0 ]; then
 	log "Pure Data started successfully!"
 else
 	log "Pure Data failed to start!"
-	flash_out_led 100
+	flash_leds 100
 	exit 1
 fi
 
@@ -104,11 +104,11 @@ RANGE="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15"
 
 sleep 0.3
 log "Pure Data started!"
-flash_out_led 1
+flash_leds 1
 sleep 0.3
-flash_out_led 1
+flash_leds 1
 sleep 0.3
-flash_out_led 1
+flash_leds 1
 
 log "Connecting all MIDI ports to and from Pure Data."
 
