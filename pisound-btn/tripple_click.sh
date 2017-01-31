@@ -28,6 +28,7 @@ flash_leds 1
 if ps -e | grep -q hostapd; then
 	log "Disabling Access point..."
 	sh $SCRIPT_PATH/disable_access_point.sh
+	killall touchosc2midi
 
 	flash_leds 20
 	sleep 0.5
@@ -35,6 +36,9 @@ if ps -e | grep -q hostapd; then
 else
 	log "Enabling Access point..."
 	sh $SCRIPT_PATH/enable_access_point.sh
+	if which touchosc2midi; then
+		nohup touchosc2midi --ip=172.24.1.1 > /dev/null 2>&1 &
+	fi
 
 	flash_leds 20
 fi
