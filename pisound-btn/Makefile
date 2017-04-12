@@ -72,6 +72,7 @@ install: all backup-scripts
 		/etc/init.d/pisound-btn stop; \
 	fi
 	@killall -PIPE pisound-btn > /dev/null 2>&1 || true
+	@systemctl stop pisound-btn > /dev/null 2>&1 || true
 	@cp pisound-btn $(BINARY_DIR)/
 	@mkdir -p $(PATCHES_DIR)
 	@chmod 777 $(PATCHES_DIR)
@@ -86,7 +87,10 @@ install: all backup-scripts
 	@cp -p disable_access_point.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/disable_access_point.sh
 	@cp -p dnsmasq.conf $(SCRIPTS_DIR)/
 	@cp -p hostapd.conf $(SCRIPTS_DIR)/
-	@cp -p pisound-btn-daemon.desktop /etc/xdg/autostart/
+	@cp -p pisound-btn.service /etc/systemd/system/
+	@systemctl daemon-reload > /dev/null 2>&1
+	@systemctl enable pisound-btn > /dev/null 2>&1
+	@systemctl start pisound-btn > /dev/null 2>&1
 
 clean:
 	rm -f pisound-btn

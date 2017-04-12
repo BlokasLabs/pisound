@@ -9,3 +9,6 @@ sed $CONFIG -i -e "s/^#dtoverlay=i2s-mmap/dtoverlay=i2s-mmap/"
 if ! grep -q -E "^dtoverlay=i2s-mmap" $CONFIG; then
 	printf "dtoverlay=i2s-mmap\n" >> $CONFIG
 fi
+
+systemctl start pisound-btn
+systemctl enable pisound-btn

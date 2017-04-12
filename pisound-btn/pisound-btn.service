@@ -1,0 +1,12 @@
+[Unit]
+Description=pisound button daemon autostart
+After=sound.target
+
+[Service]
+ExecStart=/usr/local/bin/pisound-btn
+
+[Install]
+WantedBy=multi-user.target
+
+
+
