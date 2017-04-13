@@ -20,20 +20,14 @@
 
 . $(dirname $(readlink -f $0))/common.sh
 
-log "pisound button held for $2 ms, after $1 clicks!"
+log "pisound button clicked $1 times!"
 
-if [ $1 -ne 1 ]; then
-	log "Ignoring hold after $1 clicks..."
-	exit 0
+if [ $1 -eq 1 ]; then
+	./single_click.sh
+elif [ $1 -eq 2 ]; then
+	./double_click.sh
+elif [ $1 -eq 3 ]; then
+	./tripple_click.sh
+else
+	log "No action for $1 clicks"
 fi
-
-aconnect -x
-
-for i in $(seq 1 10); do
-	flash_leds 1
-	sleep 0.1
-done
-
-log "Shutting down."
-
-sudo shutdown now

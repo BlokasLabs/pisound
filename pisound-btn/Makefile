@@ -19,7 +19,7 @@
 BINARY_DIR ?= /usr/local/bin
 SCRIPTS_DIR ?= /usr/local/etc/pisound
 PATCHES_DIR ?= /usr/local/etc/pisound-patches
-BACKUP_DIR := $(shell echo $(SCRIPTS_DIR)/backups/`date +"%F.%T"`)
+BACKUP_DIR ?= $(shell echo /usr/local/etc/pisound-backups/`date +"%F.%T"`)
 
 all: pisound-btn
 
@@ -27,43 +27,15 @@ pisound-btn: pisound-btn.c
 	gcc pisound-btn.c -o pisound-btn
 
 backup-scripts:
-	@echo "Backing up scripts in $(SCRIPTS_DIR) to $(BACKUP_DIR)"
-	@mkdir -p $(BACKUP_DIR)
-	@if test -e $(SCRIPTS_DIR)/click.sh; then \
-		cp -pR $(SCRIPTS_DIR)/click.sh $(BACKUP_DIR)/; \
-	fi
-	@if test -e $(SCRIPTS_DIR)/single_click.sh; then \
-		cp -pR $(SCRIPTS_DIR)/single_click.sh $(BACKUP_DIR)/; \
-	fi
-	@if test -e $(SCRIPTS_DIR)/double_click.sh; then \
-		cp -pR $(SCRIPTS_DIR)/double_click.sh $(BACKUP_DIR)/; \
-	fi
-	@if test -e $(SCRIPTS_DIR)/down.sh; then \
-		cp -pR $(SCRIPTS_DIR)/down.sh $(BACKUP_DIR)/; \
-	fi
-	@if test -e $(SCRIPTS_DIR)/up.sh; then \
-		cp -pR $(SCRIPTS_DIR)/up.sh $(BACKUP_DIR)/; \
-	fi
-	@if test -e $(SCRIPTS_DIR)/hold.sh; then \
-		cp -pR $(SCRIPTS_DIR)/hold.sh $(BACKUP_DIR)/; \
-	fi
-	@if test -e $(SCRIPTS_DIR)/common.sh; then \
-		cp -pR $(SCRIPTS_DIR)/common.sh $(BACKUP_DIR)/; \
-	fi
-	@if test -e $(SCRIPTS_DIR)/tripple_click.sh; then \
-		cp -pR $(SCRIPTS_DIR)/tripple_click.sh $(BACKUP_DIR)/; \
-	fi
-	@if test -e $(SCRIPTS_DIR)/enable_access_point.sh; then \
-		cp -pR $(SCRIPTS_DIR)/enable_access_point.sh $(BACKUP_DIR)/; \
-	fi
-	@if test -e $(SCRIPTS_DIR)/disable_access_point.sh; then \
-		cp -pR $(SCRIPTS_DIR)/disable_access_point.sh $(BACKUP_DIR)/; \
-	fi
-	@if test -e $(SCRIPTS_DIR)/hostapd.conf; then \
-		cp -pR $(SCRIPTS_DIR)/hostapd.conf $(BACKUP_DIR)/; \
-	fi
-	@if test -e $(SCRIPTS_DIR)/dnsmasq.conf; then \
-		cp -pR $(SCRIPTS_DIR)/dnsmasq.conf $(BACKUP_DIR)/; \
+	@if test -e $(SCRIPTS_DIR); then \
+		echo "Backing up scripts in $(SCRIPTS_DIR) to $(BACKUP_DIR)"; \
+		mkdir -p $(BACKUP_DIR); \
+		if test -e $(SCRIPTS_DIR)/backups; then \
+			echo "Migrating $(SCRIPTS_DIR)/backups to $(BACKUP_DIR)"; \
+			mv $(SCRIPTS_DIR)/backups/* $(BACKUP_DIR)/; \
+			rm -r $(SCRIPTS_DIR)/backups/; \
+		fi; \
+		mv $(SCRIPTS_DIR)/* $(BACKUP_DIR)/; \
 	fi
 
 install: all backup-scripts
@@ -74,8 +46,10 @@ install: all backup-scripts
 	@killall -PIPE pisound-btn > /dev/null 2>&1 || true
 	@systemctl stop pisound-btn > /dev/null 2>&1 || true
 	@cp pisound-btn $(BINARY_DIR)/
+	@mkdir -p $(SCRIPTS_DIR)
 	@mkdir -p $(PATCHES_DIR)
 	@chmod 777 $(PATCHES_DIR)
+	@cp -p click.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/click.sh
 	@cp -p single_click.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/single_click.sh
 	@cp -p double_click.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/double_click.sh
 	@cp -p tripple_click.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/tripple_click.sh

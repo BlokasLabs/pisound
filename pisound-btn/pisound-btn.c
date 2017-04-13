@@ -32,20 +32,18 @@
 
 #define HOMEPAGE_URL "http://blokas.io/pisound"
 
-enum { PISOUND_BTN_VERSION     = 0x0101 };
+enum { PISOUND_BTN_VERSION     = 0x0102 };
 enum { INVALID_VERSION         = 0xffff };
 enum { BUTTON_PIN              = 17     };
 enum { CLICK_TIMEOUT_MS        = 300    };
 enum { HOLD_PRESS_TIMEOUT_MS   = CLICK_TIMEOUT_MS };
-enum { PRESS_COUNT_LIMIT       = 3      };
+enum { PRESS_COUNT_LIMIT       = 8      };
 
 #define SCRIPTS_DIR "/usr/local/etc/pisound"
 
 static const char *const DOWN_ACTION          = SCRIPTS_DIR "/down.sh";         // Executed every time the button is pushed down.
 static const char *const UP_ACTION            = SCRIPTS_DIR "/up.sh";           // Executed every time the button is released up.
-static const char *const SINGLE_CLICK_ACTION  = SCRIPTS_DIR "/single_click.sh"; // Executed if the button was clicked and released once in timeout.
-static const char *const DOUBLE_CLICK_ACTION  = SCRIPTS_DIR "/double_click.sh"; // Executed if the button was double clicked within given timeout.
-static const char *const TRIPPLE_CLICK_ACTION = SCRIPTS_DIR "/tripple_click.sh";// Executed if the button was tripple clicke within given timeout.
+static const char *const CLICK_ACTION         = SCRIPTS_DIR "/click.sh";        // Executed when the button is short-clicked one or multiple times in quick succession.
 static const char *const HOLD_ACTION          = SCRIPTS_DIR "/hold.sh";         // Executed if the button was held for given time.
 
 static const char *const PISOUND_VERSION_FILE = "/sys/kernel/pisound/version";
@@ -170,21 +168,9 @@ unsigned short get_kernel_module_version(void)
 
 static void onTimesClicked(unsigned num_presses)
 {
-	switch (num_presses)
-	{
-	case 1:
-		system(SINGLE_CLICK_ACTION);
-		break;
-	case 2:
-		system(DOUBLE_CLICK_ACTION);
-		break;
-	case 3:
-		system(TRIPPLE_CLICK_ACTION);
-		break;
-	default:
-		fprintf(stderr, "onTimesClicked(%u) called, unexpected!\n", num_presses);
-		return;
-	}
+	char cmd[64];
+	sprintf(cmd, "%s %u", CLICK_ACTION, num_presses);
+	system(cmd);
 }
 
 static void onDown(void)
@@ -197,10 +183,10 @@ static void onUp(void)
 	system(UP_ACTION);
 }
 
-static void onHold(unsigned num_presses)
+static void onHold(unsigned num_presses, timestamp_ms_t timeHeld)
 {
 	char cmd[64];
-	sprintf(cmd, "%s %u", HOLD_ACTION, num_presses);
+	sprintf(cmd, "%s %u %u", HOLD_ACTION, num_presses, timeHeld);
 	system(cmd);
 }
 
@@ -322,7 +308,7 @@ int run(void)
 				{
 					if (timestamp - pressed_at >= HOLD_PRESS_TIMEOUT_MS)
 					{
-						onHold(num_pressed);
+						onHold(num_pressed, timestamp - pressed_at);
 					}
 				}
 			}
