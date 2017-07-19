@@ -52,7 +52,7 @@ install: all backup-scripts
 	@cp -p click.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/click.sh
 	@cp -p single_click.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/single_click.sh
 	@cp -p double_click.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/double_click.sh
-	@cp -p tripple_click.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/tripple_click.sh
+	@cp -p triple_click.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/triple_click.sh
 	@cp -p up.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/up.sh
 	@cp -p down.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/down.sh
 	@cp -p hold.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/hold.sh

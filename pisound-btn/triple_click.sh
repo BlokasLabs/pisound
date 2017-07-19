@@ -22,7 +22,7 @@ SCRIPT_PATH=$(dirname $(readlink -f $0))
 
 . $SCRIPT_PATH/common.sh
 
-log "pisound button tripple clicked!"
+log "pisound button triple clicked!"
 flash_leds 1
 
 if ps -e | grep -q hostapd; then

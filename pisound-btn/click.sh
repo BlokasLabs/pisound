@@ -18,16 +18,18 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
 
-. $(dirname $(readlink -f $0))/common.sh
+CURRENT_SCRIPT_DIR=$(dirname $(readlink -f $0))
+
+. $CURRENT_SCRIPT_DIR/common.sh
 
 log "pisound button clicked $1 times!"
 
 if [ $1 -eq 1 ]; then
-	./single_click.sh
+	$CURRENT_SCRIPT_DIR/single_click.sh
 elif [ $1 -eq 2 ]; then
-	./double_click.sh
+	$CURRENT_SCRIPT_DIR/double_click.sh
 elif [ $1 -eq 3 ]; then
-	./tripple_click.sh
+	$CURRENT_SCRIPT_DIR/triple_click.sh
 else
 	log "No action for $1 clicks"
 fi
