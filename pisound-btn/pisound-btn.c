@@ -30,9 +30,10 @@
 #include <poll.h>
 #include <time.h>
 
-#define HOMEPAGE_URL "http://blokas.io/pisound"
+#define HOMEPAGE_URL "https://blokas.io/pisound"
+#define UPDATE_URL   HOMEPAGE_URL "/updates?btnv=%x.%02x&v=%s&sn=%s&id=%s"
 
-enum { PISOUND_BTN_VERSION     = 0x0102 };
+enum { PISOUND_BTN_VERSION     = 0x0103 };
 enum { INVALID_VERSION         = 0xffff };
 enum { BUTTON_PIN              = 17     };
 enum { CLICK_TIMEOUT_MS        = 300    };
@@ -46,7 +47,11 @@ static const char *const UP_ACTION            = SCRIPTS_DIR "/up.sh";           
 static const char *const CLICK_ACTION         = SCRIPTS_DIR "/click.sh";        // Executed when the button is short-clicked one or multiple times in quick succession.
 static const char *const HOLD_ACTION          = SCRIPTS_DIR "/hold.sh";         // Executed if the button was held for given time.
 
+static const char *const PISOUND_ID_FILE      = "/sys/kernel/pisound/id";
+static const char *const PISOUND_SERIAL_FILE  = "/sys/kernel/pisound/serial";
 static const char *const PISOUND_VERSION_FILE = "/sys/kernel/pisound/version";
+
+static const char *const UPDATE_CHECK_DISABLE_FILE = SCRIPTS_DIR "/disable_update_check"; // If the file exists, the update check will be disabled.
 
 int gpio_is_pin_valid(int pin)
 {
@@ -148,22 +153,102 @@ timestamp_ms_t get_timestamp_ms(void)
 	return tp.tv_sec * 1000 + tp.tv_nsec / 1000000;
 }
 
-unsigned short get_kernel_module_version(void)
+static bool is_update_check_enabled()
 {
-	FILE *f = fopen(PISOUND_VERSION_FILE, "rt");
+	struct stat s;
+	return stat(UPDATE_CHECK_DISABLE_FILE, &s) != 0;
+}
 
-	if (!f)
-		return INVALID_VERSION;
-
+static bool parse_version(unsigned short *result, const char *version)
+{
 	unsigned int major;
 	unsigned int minor;
-	int n = fscanf(f, "%u.%u", &major, &minor);
-	fclose(f);
+	int n = sscanf(version, "%u.%u", &major, &minor);
 
 	if (n == 2)
-		return ((major & 0xff) << 8) + (minor & 0xff);
+	{
+		*result = ((major & 0xff) << 8) + (minor & 0xff);
+		return true;
+	}
 
-	return INVALID_VERSION;
+	*result = INVALID_VERSION;
+	return false;
+}
+
+static void check_for_updates(unsigned short btn_version, const char *version, const char *serial, const char *id)
+{
+	char url[512];
+	if (snprintf(url, sizeof(url), UPDATE_URL, (btn_version & 0xff00) >> 8, btn_version & 0xff, version, serial, id) < 0)
+		return;
+
+	char cmd[1024];
+	if (snprintf(cmd, sizeof(cmd), "sleep 30 && wget \"%s\" -O - > /dev/null 2>&1 &", url) < 0)
+		return;
+
+	system(cmd);
+}
+
+static bool read_text_file(char *dst, size_t buffer_size, size_t *bytes_read, const char *file)
+{
+	if (!dst || !file || buffer_size == 0)
+		return false;
+
+	*dst = '\0';
+	*bytes_read = 0;
+
+	FILE *f = fopen(file, "rt");
+	if (!f)
+		return false;
+
+	char buff[1024];
+	size_t current_index = 0;
+	while (!feof(f) && current_index < (buffer_size-1))
+	{
+		size_t n = fread(buff, sizeof(buff[0]), sizeof(buff)/sizeof(buff[0]), f);
+
+		size_t space_available = buffer_size - 1 - current_index;
+		size_t to_copy = n > space_available ? space_available : n;
+		memcpy(&dst[current_index], buff, to_copy);
+
+		current_index += to_copy;
+	}
+
+	fclose(f);
+
+	*bytes_read = current_index;
+	dst[current_index] = '\0';
+
+	return true;
+}
+
+static bool read_pisound_system_file(char *dst, size_t length, const char *file)
+{
+	char buffer[64];
+	size_t n;
+	if (!read_text_file(buffer, sizeof(buffer), &n, file))
+		return false;
+
+	strncpy(dst, buffer, length);
+
+	if (n > 1)
+		dst[strlen(dst)-1] = '\0';
+
+	return true;
+}
+
+bool get_pisound_version(char *dst, size_t length)
+{
+	return read_pisound_system_file(dst, length, PISOUND_VERSION_FILE);
+}
+
+bool get_pisound_serial(char *dst, size_t length)
+{
+	return read_pisound_system_file(dst, length, PISOUND_SERIAL_FILE);
+}
+
+bool get_pisound_id(char *dst, size_t length)
+{
+	return read_pisound_system_file(dst, length, PISOUND_ID_FILE);
 }
 
 static void onTimesClicked(unsigned num_presses)
@@ -192,14 +277,32 @@ static void onHold(unsigned num_presses, timestamp_ms_t timeHeld)
 
 int run(void)
 {
-	unsigned short version = get_kernel_module_version();
+	char version_string[64];
+	char serial[64];
+	char id[64];
 
-	if (version == INVALID_VERSION)
+	if (!get_pisound_serial(serial, sizeof(serial)))
+	{
+		fprintf(stderr, "Reading pisound serial failed, did the kernel module load successfully?\n");
+		return -EINVAL;
+	}
+	if (!get_pisound_id(id, sizeof(id)))
+	{
+		fprintf(stderr, "Reading pisound id failed, did the kernel module load successfully?\n");
+		return -EINVAL;
+	}
+
+	unsigned short version = INVALID_VERSION;
+	if (!get_pisound_version(version_string, sizeof(version_string)) || !parse_version(&version, version_string))
 	{
 		fprintf(stderr, "Reading pisound version failed, did the kernel module load successfully?\n");
 		return -EINVAL;
 	}
-	else if (version < 0x0100 || version >= 0x0200)
+
+	if (is_update_check_enabled())
+		check_for_updates(PISOUND_BTN_VERSION, version_string, serial, id);
+
+	if (version < 0x0100 || version >= 0x0200)
 	{
 		fprintf(stderr, "The kernel module version (%04x) and pisound-btn version (%04x) are incompatible! Please check for updates at " HOMEPAGE_URL "\n", version, PISOUND_BTN_VERSION);
 		return -EINVAL;
