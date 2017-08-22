@@ -20,6 +20,9 @@
 
 PURE_DATA_STARTUP_SLEEP=3
 
+export XAUTHORITY=/home/pi/.Xauthority
+export DISPLAY=:0
+
 . $(dirname $(readlink -f $0))/common.sh
 
 log "pisound button single clicked!"
