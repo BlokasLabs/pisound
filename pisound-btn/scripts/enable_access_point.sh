@@ -1,7 +1,7 @@
 #!/bin/sh
 
-# pisound-btn daemon for the pisound button.
-# Copyright (C) 2016  Vilniaus Blokas UAB, http://blokas.io/pisound
+# pisound-btn daemon for the Pisound button.
+# Copyright (C) 2017  Vilniaus Blokas UAB, https://blokas.io/pisound
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,18 +18,15 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
 
-CURRENT_SCRIPT_DIR=$(dirname $(readlink -f $0))
+SCRIPT_PATH=$(dirname $(readlink -f $0))
 
-. $CURRENT_SCRIPT_DIR/common.sh
-
-log "pisound button clicked $1 times!"
-
-if [ $1 -eq 1 ]; then
-	$CURRENT_SCRIPT_DIR/single_click.sh
-elif [ $1 -eq 2 ]; then
-	$CURRENT_SCRIPT_DIR/double_click.sh
-elif [ $1 -eq 3 ]; then
-	$CURRENT_SCRIPT_DIR/triple_click.sh
-else
-	log "No action for $1 clicks"
-fi
+sudo dhcpcd --denyinterfaces wlan0
+sudo ifdown wlan0
+sudo ifconfig wlan0 172.24.1.1 netmask 255.255.255.0 broadcast 172.24.1.255
+sudo killall dnsmasq
+sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+sudo iptables -A FORWARD -i eth0 -o wlan0 -m state --state RELATED,ESTABLISHED -j ACCEPT
+sudo iptables -A FORWARD -i wlan0 -o eth0 -j ACCEPT
+sudo sh -c "echo 1 > /proc/sys/net/ipv4/ip_forward"
+sudo dnsmasq -C $SCRIPT_PATH/dnsmasq.conf
+sudo nohup /usr/sbin/hostapd $SCRIPT_PATH/hostapd.conf > /dev/null 2>&1 &

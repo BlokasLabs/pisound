@@ -1,7 +1,7 @@
 #!/bin/sh
 
-# pisound-btn daemon for the pisound button.
-# Copyright (C) 2016  Vilniaus Blokas UAB, http://blokas.io/pisound
+# pisound-btn daemon for the Pisound button.
+# Copyright (C) 2017  Vilniaus Blokas UAB, https://blokas.io/pisound
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,26 +18,22 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
 
-log() {
-	echo `date +"%F.%T"`: $*
-}
+. /usr/local/etc/pisound/common.sh
 
-PISOUND_MIDI_DEVICE=`amidi -l | grep pisound | egrep -o hw:[0-9]+,[0-9]+`
+log "Pisound button held for $2 ms, after $1 clicks!"
 
-if [ -z $PISOUND_MIDI_DEVICE ]; then
-	log "pisound MIDI device not found!"
+if [ $1 -ne 1 ]; then
+	log "Ignoring hold after $1 clicks..."
 	exit 0
-#else
-#	log "pisound MIDI device: $PISOUND_MIDI_DEVICE"
 fi
 
-PISOUND_LED_FILE="/sys/kernel/pisound/led"
+aconnect -x
 
-# Takes an unsigned integer value, [0;255] for flash duration.
-flash_leds() {
-	if [ -e $PISOUND_LED_FILE ]; then
-		sudo sh -c "echo $1 > $PISOUND_LED_FILE"
-	else
-		amidi -S "f0 f7" -p $PISOUND_MIDI_DEVICE 2> /dev/null
-	fi
-}
+for i in $(seq 1 10); do
+	flash_leds 1
+	sleep 0.1
+done
+
+log "Shutting down."
+
+#sudo shutdown now

@@ -1,5 +1,5 @@
-# pisound-btn daemon for the pisound button.
-# Copyright (C) 2016  Vilniaus Blokas UAB, http://blokas.io/pisound
+# pisound-btn daemon for the Pisound button.
+# Copyright (C) 2017  Vilniaus Blokas UAB, https://blokas.io/pisound
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,7 +19,8 @@
 BINARY_DIR ?= /usr/local/bin
 SCRIPTS_DIR ?= /usr/local/etc/pisound
 PATCHES_DIR ?= /usr/local/etc/pisound-patches
-BACKUP_DIR ?= $(shell echo /usr/local/etc/pisound-backups/`date +"%F.%T"`)
+CURRENT_DATE := $(shell date +"%F.%T")
+BACKUP_DIR ?= /usr/local/etc/pisound-backups/$(CURRENT_DATE)
 
 all: pisound-btn
 
@@ -49,19 +50,9 @@ install: all backup-scripts
 	@mkdir -p $(SCRIPTS_DIR)
 	@mkdir -p $(PATCHES_DIR)
 	@chmod 777 $(PATCHES_DIR)
-	@cp -p click.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/click.sh
-	@cp -p single_click.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/single_click.sh
-	@cp -p double_click.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/double_click.sh
-	@cp -p triple_click.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/triple_click.sh
-	@cp -p up.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/up.sh
-	@cp -p down.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/down.sh
-	@cp -p hold.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/hold.sh
-	@cp -p common.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/common.sh
-	@cp -p enable_access_point.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/enable_access_point.sh
-	@cp -p disable_access_point.sh $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/disable_access_point.sh
-	@cp -p dnsmasq.conf $(SCRIPTS_DIR)/
-	@cp -p hostapd.conf $(SCRIPTS_DIR)/
+	@cp -pr scripts/*  $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/*.sh
 	@cp -p pisound-btn.service /etc/systemd/system/
+	@cp -p pisound.conf /etc/
 	@systemctl daemon-reload > /dev/null 2>&1
 	@systemctl enable pisound-btn > /dev/null 2>&1
 	@systemctl start pisound-btn > /dev/null 2>&1

@@ -1,6 +1,6 @@
 /*
- * pisound-btn daemon for the pisound button.
- * Copyright (C) 2016  Vilniaus Blokas UAB, http://blokas.io/pisound
+ * pisound-btn daemon for the Pisound button.
+ * Copyright (C) 2017  Vilniaus Blokas UAB, https://blokas.io/pisound
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -29,31 +29,276 @@
 #include <string.h>
 #include <poll.h>
 #include <time.h>
+#include <assert.h>
 
 #define HOMEPAGE_URL "https://blokas.io/pisound"
 #define UPDATE_URL   HOMEPAGE_URL "/updates?btnv=%x.%02x&v=%s&sn=%s&id=%s"
 
-enum { PISOUND_BTN_VERSION     = 0x0103 };
+enum { PISOUND_BTN_VERSION     = 0x0104 };
 enum { INVALID_VERSION         = 0xffff };
 enum { BUTTON_PIN              = 17     };
-enum { CLICK_TIMEOUT_MS        = 300    };
+enum { CLICK_TIMEOUT_MS        = 400    };
 enum { HOLD_PRESS_TIMEOUT_MS   = CLICK_TIMEOUT_MS };
 enum { PRESS_COUNT_LIMIT       = 8      };
 
-#define SCRIPTS_DIR "/usr/local/etc/pisound"
+#define BASE_SCRIPTS_DIR "/usr/local/etc/pisound"
 
-static const char *const DOWN_ACTION          = SCRIPTS_DIR "/down.sh";         // Executed every time the button is pushed down.
-static const char *const UP_ACTION            = SCRIPTS_DIR "/up.sh";           // Executed every time the button is released up.
-static const char *const CLICK_ACTION         = SCRIPTS_DIR "/click.sh";        // Executed when the button is short-clicked one or multiple times in quick succession.
-static const char *const HOLD_ACTION          = SCRIPTS_DIR "/hold.sh";         // Executed if the button was held for given time.
+enum action_e
+{
+	A_DOWN = 0, // Executed every time the button is pushed down.
+	A_UP,       // Executed every time the button is released up.
+	A_CLICK,    // Executed when the button is short-clicked one or multiple times in quick succession.
+	A_HOLD,     // Executed if the button was held for given time.
 
-static const char *const PISOUND_ID_FILE      = "/sys/kernel/pisound/id";
-static const char *const PISOUND_SERIAL_FILE  = "/sys/kernel/pisound/serial";
-static const char *const PISOUND_VERSION_FILE = "/sys/kernel/pisound/version";
+	// Must be the last one!
+	A_COUNT
+};
 
-static const char *const UPDATE_CHECK_DISABLE_FILE = SCRIPTS_DIR "/disable_update_check"; // If the file exists, the update check will be disabled.
+static const char *const DOWN_VALUE_NAME           = "DOWN";
+static const char *const UP_VALUE_NAME             = "UP";
 
-int gpio_is_pin_valid(int pin)
+static const char *const SINGLE_CLICK_VALUE_NAME   = "SINGLE_CLICK";
+static const char *const DOUBLE_CLICK_VALUE_NAME   = "DOUBLE_CLICK";
+static const char *const TRIPLE_CLICK_VALUE_NAME   = "TRIPLE_CLICK";
+static const char *const OTHER_CLICKS_VALUE_NAME   = "OTHER_CLICKS";
+
+static const char *const HOLD_1S_VALUE_NAME        = "HOLD_1S";
+static const char *const HOLD_3S_VALUE_NAME        = "HOLD_3S";
+static const char *const HOLD_5S_VALUE_NAME        = "HOLD_5S";
+static const char *const HOLD_OTHER_VALUE_NAME     = "HOLD_OTHER";
+
+static const char *const PISOUND_ID_FILE           = "/sys/kernel/pisound/id";
+static const char *const PISOUND_SERIAL_FILE       = "/sys/kernel/pisound/serial";
+static const char *const PISOUND_VERSION_FILE      = "/sys/kernel/pisound/version";
+
+static const char *const UPDATE_CHECK_DISABLE_FILE = BASE_SCRIPTS_DIR "/disable_update_check"; // If the file exists, the update check will be disabled.
+
+static const char *const DEFAULT_DOWN              = BASE_SCRIPTS_DIR "/down.sh";
+static const char *const DEFAULT_UP                = BASE_SCRIPTS_DIR "/up.sh";
+
+static const char *const DEFAULT_SINGLE_CLICK      = BASE_SCRIPTS_DIR "/start_puredata.sh";
+static const char *const DEFAULT_DOUBLE_CLICK      = BASE_SCRIPTS_DIR "/stop_puredata.sh";
+static const char *const DEFAULT_TRIPLE_CLICK      = BASE_SCRIPTS_DIR "/toggle_wifi_hotspot.sh";
+
+// Receives 'times clicked' argument.
+static const char *const DEFAULT_OTHER_CLICKS      = BASE_SCRIPTS_DIR "/click.sh";
+
+// Receive 'held after n clicks' and 'time held' arguments.
+static const char *const DEFAULT_HOLD_1S           = BASE_SCRIPTS_DIR "/shutdown.sh";
+static const char *const DEFAULT_HOLD_3S           = BASE_SCRIPTS_DIR "/shutdown.sh";
+static const char *const DEFAULT_HOLD_5S           = BASE_SCRIPTS_DIR "/shutdown.sh";
+static const char *const DEFAULT_HOLD_OTHER        = BASE_SCRIPTS_DIR "/shutdown.sh";
+
+// Arbitrarily chosen limit.
+enum { MAX_PATH_LENGTH = 4096 };
+
+static char g_config_path[MAX_PATH_LENGTH+1]  = "/etc/pisound.conf";
+
+// Reads a line, truncates it if needed, seeks to the next line.
+static bool read_line(FILE *f, char *buffer, size_t n)
+{
+	memset(buffer, 0, n);
+
+	if (fgets(buffer, n, f) == NULL)
+		return false;
+
+	if (buffer[n-2] != '\0' && buffer[n-2] != '\n')
+	{
+		// Whole line didn't fit into the buffer, seek until next line.
+		while (!feof(f))
+		{
+			int c = fgetc(f);
+			if (c == '\n')
+				break;
+		}
+	}
+
+	return true;
+}
+
+static void read_config_value(const char *conf, const char *value_name, char *dst, size_t n, const char *default_value)
+{
+	FILE *f = fopen(conf, "rt");
+	if (f == NULL)
+		return;
+
+	const size_t BUFFER_SIZE = 2 * MAX_PATH_LENGTH + 1;
+	char line[BUFFER_SIZE];
+	char name[BUFFER_SIZE];
+	char value[BUFFER_SIZE];
+
+	size_t currentLine = 0;
+
+	bool found = false;
+
+	while (!feof(f))
+	{
+		if (read_line(f, line, sizeof(line)))
+		{
+			++currentLine;
+
+			if (strlen(line) > 1)
+			{
+				int count = sscanf(line, "%s %s", name, value);
+				if (count == 2)
+				{
+					// Skip comments.
+					if (name[0] == '#')
+						continue;
+
+					if (strcmp(name, value_name) == 0)
+					{
+						size_t len = strlen(value);
+						if (len < n)
+						{
+							strncpy(dst, value, len);
+							dst[len] = '\0';
+							found = true;
+						}
+						else
+						{
+							fprintf(stderr, "Too long value set in %s on line %u!\n", conf, currentLine);
+						}
+					}
+				}
+				else
+				{
+					if (count != 1 || name[0] != '#')
+					{
+						fprintf(stderr, "Unexpected syntax in %s on line %u!\n", conf, currentLine);
+					}
+				}
+			}
+		}
+	}
+
+	fclose(f);
+
+	if (!found)
+	{
+		strcpy(dst, default_value);
+	}
+}
+
+static void get_default_action_and_script(enum action_e action, unsigned arg0, unsigned arg1, const char **name, const char **script)
+{
+	switch (action)
+	{
+	case A_DOWN:
+		*name = DOWN_VALUE_NAME;
+		*script = DEFAULT_DOWN;
+		break;
+	case A_UP:
+		*name = UP_VALUE_NAME;
+		*script = DEFAULT_UP;
+		break;
+	case A_CLICK:
+		switch (arg0)
+		{
+		case 1:
+			*name = SINGLE_CLICK_VALUE_NAME;
+			*script = DEFAULT_SINGLE_CLICK;
+			break;
+		case 2:
+			*name = DOUBLE_CLICK_VALUE_NAME;
+			*script = DEFAULT_DOUBLE_CLICK;
+			break;
+		case 3:
+			*name = TRIPLE_CLICK_VALUE_NAME;
+			*script = DEFAULT_TRIPLE_CLICK;
+			break;
+		default:
+			*name = OTHER_CLICKS_VALUE_NAME;
+			*script = DEFAULT_OTHER_CLICKS;
+			break;
+		}
+		break;
+	case A_HOLD:
+		if (arg1 < 3000)
+		{
+			*name = HOLD_1S_VALUE_NAME;
+			*script = DEFAULT_HOLD_1S;
+		}
+		else if (arg1 < 5000)
+		{
+			*name = HOLD_3S_VALUE_NAME;
+			*script = DEFAULT_HOLD_3S;
+		}
+		else if (arg1 < 7000)
+		{
+			*name = HOLD_5S_VALUE_NAME;
+			*script = DEFAULT_HOLD_5S;
+		}
+		else
+		{
+			*name = HOLD_OTHER_VALUE_NAME;
+			*script = DEFAULT_HOLD_OTHER;
+		}
+		break;
+	default:
+		*name = NULL;
+		*script = NULL;
+		break;
+	}
+}
+
+// Returns the length of the path or an error (negative number).
+static int get_action_script_path(enum action_e action, unsigned arg0, unsigned arg1, char *dst, size_t n)
+{
+	if (action < 0 || action >= A_COUNT)
+		return -EINVAL;
+
+	const char *action_name = NULL;
+	const char *default_script = NULL;
+
+	get_default_action_and_script(action, arg0, arg1, &action_name, &default_script);
+
+	if (action_name == NULL || default_script == NULL)
+		return -EINVAL;
+
+	char script[MAX_PATH_LENGTH + 1];
+
+	read_config_value(g_config_path, action_name, dst, n, default_script);
+
+	return strlen(dst);
+}
+
+static void execute_action(enum action_e action, unsigned arg0, unsigned arg1)
+{
+	char cmd[MAX_PATH_LENGTH + 64];
+	int n = get_action_script_path(action, arg0, arg1, cmd, sizeof(cmd));
+	if (n < 0)
+	{
+		fprintf(stderr, "execute_action: getting script path for action %u resulted in error %d!\n", action, n);
+		return;
+	}
+
+	char *p = cmd + n;
+	size_t remainingSpace = sizeof(cmd) - n + 1;
+	int result = 0;
+
+	switch (action)
+	{
+	case A_CLICK:
+		result = snprintf(p, remainingSpace, " %u", arg0);
+		break;
+	case A_HOLD:
+		result = snprintf(p, remainingSpace, " %u %u", arg0, arg1);
+		break;
+	default:
+		break;
+	}
+
+	if (result < 0 || result >= remainingSpace)
+	{
+		fprintf(stderr, "execute_action: failed setting up arguments for action %u, result: %d!\n", action, result);
+		return;
+	}
+
+	system(cmd);
+}
+
+static int gpio_is_pin_valid(int pin)
 {
 	return pin >= 0 && pin < 100;
 }
@@ -66,7 +311,7 @@ enum edge_e
 	E_BOTH    = 3,
 };
 
-int gpio_set_edge(int pin, enum edge_e edge)
+static int gpio_set_edge(int pin, enum edge_e edge)
 {
 	if (!gpio_is_pin_valid(pin))
 	{
@@ -111,7 +356,7 @@ int gpio_set_edge(int pin, enum edge_e edge)
 	return 0;
 }
 
-int gpio_open(int pin)
+static int gpio_open(int pin)
 {
 	if (!gpio_is_pin_valid(pin))
 	{
@@ -133,7 +378,7 @@ int gpio_open(int pin)
 	return fd;
 }
 
-int gpio_close(int fd)
+static int gpio_close(int fd)
 {
 	int err = close(fd);
 	if (err != 0)
@@ -146,7 +391,7 @@ int gpio_close(int fd)
 
 typedef unsigned long long timestamp_ms_t;
 
-timestamp_ms_t get_timestamp_ms(void)
+static timestamp_ms_t get_timestamp_ms(void)
 {
 	struct timespec tp;
 	clock_gettime(CLOCK_MONOTONIC, &tp);
@@ -236,46 +481,42 @@ static bool read_pisound_system_file(char *dst, size_t length, const char *file)
 	return true;
 }
 
-bool get_pisound_version(char *dst, size_t length)
+static bool get_pisound_version(char *dst, size_t length)
 {
 	return read_pisound_system_file(dst, length, PISOUND_VERSION_FILE);
 }
 
-bool get_pisound_serial(char *dst, size_t length)
+static bool get_pisound_serial(char *dst, size_t length)
 {
 	return read_pisound_system_file(dst, length, PISOUND_SERIAL_FILE);
 }
 
-bool get_pisound_id(char *dst, size_t length)
+static bool get_pisound_id(char *dst, size_t length)
 {
 	return read_pisound_system_file(dst, length, PISOUND_ID_FILE);
 }
 
 static void onTimesClicked(unsigned num_presses)
 {
-	char cmd[64];
-	sprintf(cmd, "%s %u", CLICK_ACTION, num_presses);
-	system(cmd);
+	execute_action(A_CLICK, num_presses, 0);
 }
 
 static void onDown(void)
 {
-	system(DOWN_ACTION);
+	execute_action(A_DOWN, 0, 0);
 }
 
 static void onUp(void)
 {
-	system(UP_ACTION);
+	execute_action(A_UP, 0, 0);
 }
 
-static void onHold(unsigned num_presses, timestamp_ms_t timeHeld)
+static void onHold(unsigned num_presses, timestamp_ms_t time_held)
 {
-	char cmd[64];
-	sprintf(cmd, "%s %u %u", HOLD_ACTION, num_presses, timeHeld);
-	system(cmd);
+	execute_action(A_HOLD, num_presses, time_held);
 }
 
-int run(void)
+static int run(void)
 {
 	char version_string[64];
 	char serial[64];
@@ -283,19 +524,19 @@ int run(void)
 
 	if (!get_pisound_serial(serial, sizeof(serial)))
 	{
-		fprintf(stderr, "Reading pisound serial failed, did the kernel module load successfully?\n");
+		fprintf(stderr, "Reading Pisound serial failed, did the kernel module load successfully?\n");
 		return -EINVAL;
 	}
 	if (!get_pisound_id(id, sizeof(id)))
 	{
-		fprintf(stderr, "Reading pisound id failed, did the kernel module load successfully?\n");
+		fprintf(stderr, "Reading Pisound id failed, did the kernel module load successfully?\n");
 		return -EINVAL;
 	}
 
 	unsigned short version = INVALID_VERSION;
 	if (!get_pisound_version(version_string, sizeof(version_string)) || !parse_version(&version, version_string))
 	{
-		fprintf(stderr, "Reading pisound version failed, did the kernel module load successfully?\n");
+		fprintf(stderr, "Reading Pisound version failed, did the kernel module load successfully?\n");
 		return -EINVAL;
 	}
 
@@ -439,17 +680,18 @@ int run(void)
 	return 0;
 }
 
-void print_version(void)
+static void print_version(void)
 {
 	printf("Version %x.%02x, Blokas Labs " HOMEPAGE_URL "\n", PISOUND_BTN_VERSION >> 8, PISOUND_BTN_VERSION & 0xff);
 }
 
-void print_usage(void)
+static void print_usage(void)
 {
 	printf("Usage: pisound-btn [options]\n"
 		"Options:\n"
-		"\t--help     Display the usage information.\n"
-		"\t--version  Show the version information.\n"
+		"\t--help      Display the usage information.\n"
+		"\t--version   Show the version information.\n"
+		"\t--conf      Specify the path to configuration file to use. Default is /etc/pisound.conf.\n"
 		"\n"
 		);
 	print_version();
@@ -470,11 +712,26 @@ int main(int argc, char **argv)
 			print_version();
 			return 0;
 		}
+		else if (strcmp(argv[i], "--conf") == 0)
+		{
+			if (i + 1 < argc)
+			{
+				strncpy(g_config_path, argv[i+1], MAX_PATH_LENGTH);
+				g_config_path[MAX_PATH_LENGTH] = '\0';
+				++i;
+			}
+			else
+			{
+				printf("Missing path argument for '%s'!\n", argv[i]);
+				print_usage();
+				return 1;
+			}
+		}
 		else
 		{
 			printf("Unknown option '%s'.\n", argv[i]);
 			print_usage();
-			return 0;
+			return 1;
 		}
 	}
 

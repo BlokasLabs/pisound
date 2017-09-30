@@ -1,7 +1,7 @@
 #!/bin/sh
 
-# pisound-btn daemon for the pisound button.
-# Copyright (C) 2016  Vilniaus Blokas UAB, http://blokas.io/pisound
+# pisound-btn daemon for the Pisound button.
+# Copyright (C) 2017  Vilniaus Blokas UAB, https://blokas.io/pisound
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -23,9 +23,9 @@ PURE_DATA_STARTUP_SLEEP=3
 export XAUTHORITY=/home/pi/.Xauthority
 export DISPLAY=:0
 
-. $(dirname $(readlink -f $0))/common.sh
+. /usr/local/etc/pisound/common.sh
 
-log "pisound button single clicked!"
+log "Pisound button single clicked!"
 aconnect -x
 flash_leds 1
 

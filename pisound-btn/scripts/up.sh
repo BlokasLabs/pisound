@@ -1,7 +1,7 @@
 #!/bin/sh
 
-# pisound-btn daemon for the pisound button.
-# Copyright (C) 2016  Vilniaus Blokas UAB, http://blokas.io/pisound
+# pisound-btn daemon for the Pisound button.
+# Copyright (C) 2017  Vilniaus Blokas UAB, https://blokas.io/pisound
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,11 +18,9 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
 
-sudo dhcpcd --allowinterfaces wlan0
-sudo killall hostapd
-sudo killall dnsmasq
-sudo ifconfig wlan0 0.0.0.0
-sudo sh -c "echo | iptables-restore"
-sudo sh -c "echo 0 > /proc/sys/net/ipv4/ip_forward"
-sudo iwlist wlan0 scan > /dev/null 2>&1
-sudo ifup wlan0
+# This event is a bit spammy, and as of now unused. Feel free to customize.
+
+. /usr/local/etc/pisound/common.sh
+#log "Pisound button up!"
+
+periodic_led_blink 0 0 /tmp/.pisound-down-pid

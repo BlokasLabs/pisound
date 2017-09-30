@@ -1,7 +1,7 @@
 #!/bin/sh
 
-# pisound-btn daemon for the pisound button.
-# Copyright (C) 2016  Vilniaus Blokas UAB, http://blokas.io/pisound
+# pisound-btn daemon for the Pisound button.
+# Copyright (C) 2017  Vilniaus Blokas UAB, https://blokas.io/pisound
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,22 +18,9 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
 
-. $(dirname $(readlink -f $0))/common.sh
+# This event is a bit spammy, and as of now unused. Feel free to customize.
 
-log "pisound button held for $2 ms, after $1 clicks!"
+. /usr/local/etc/pisound/common.sh
+#log "Pisound button down!"
 
-if [ $1 -ne 1 ]; then
-	log "Ignoring hold after $1 clicks..."
-	exit 0
-fi
-
-aconnect -x
-
-for i in $(seq 1 10); do
-	flash_leds 1
-	sleep 0.1
-done
-
-log "Shutting down."
-
-sudo shutdown now
+periodic_led_blink 10 1.0 /tmp/.pisound-down-pid
