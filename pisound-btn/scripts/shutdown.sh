@@ -36,4 +36,4 @@ done
 
 log "Shutting down."
 
-#sudo shutdown now
+sudo shutdown now
