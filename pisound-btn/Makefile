@@ -37,7 +37,7 @@ backup-scripts:
 			rm -r $(SCRIPTS_DIR)/backups/; \
 		fi; \
 		mv $(SCRIPTS_DIR)/* $(BACKUP_DIR)/; \
-		cp /etc/pisound.conf $(BACKUP_DIR)/; \
+		if test -e /etc/pisound.conf; then cp /etc/pisound.conf $(BACKUP_DIR)/; fi; \
 	fi
 
 install: all backup-scripts
