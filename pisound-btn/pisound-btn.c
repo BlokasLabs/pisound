@@ -84,8 +84,8 @@ static const char *const DEFAULT_TRIPLE_CLICK      = BASE_SCRIPTS_DIR "/toggle_w
 static const char *const DEFAULT_OTHER_CLICKS      = BASE_SCRIPTS_DIR "/click.sh";
 
 // Receive 'held after n clicks' and 'time held' arguments.
-static const char *const DEFAULT_HOLD_1S           = BASE_SCRIPTS_DIR "/shutdown.sh";
-static const char *const DEFAULT_HOLD_3S           = BASE_SCRIPTS_DIR "/shutdown.sh";
+static const char *const DEFAULT_HOLD_1S           = BASE_SCRIPTS_DIR "/hold.sh";
+static const char *const DEFAULT_HOLD_3S           = BASE_SCRIPTS_DIR "/toggle_bt_discoverable.sh";
 static const char *const DEFAULT_HOLD_5S           = BASE_SCRIPTS_DIR "/shutdown.sh";
 static const char *const DEFAULT_HOLD_OTHER        = BASE_SCRIPTS_DIR "/shutdown.sh";
 
@@ -118,10 +118,6 @@ static bool read_line(FILE *f, char *buffer, size_t n)
 
 static void read_config_value(const char *conf, const char *value_name, char *dst, size_t n, const char *default_value)
 {
-	FILE *f = fopen(conf, "rt");
-	if (f == NULL)
-		return;
-
 	const size_t BUFFER_SIZE = 2 * MAX_PATH_LENGTH + 1;
 	char line[BUFFER_SIZE];
 	char name[BUFFER_SIZE];
@@ -131,7 +127,9 @@ static void read_config_value(const char *conf, const char *value_name, char *ds
 
 	bool found = false;
 
-	while (!feof(f))
+	FILE *f = fopen(conf, "rt");
+
+	while (f && !feof(f))
 	{
 		if (read_line(f, line, sizeof(line)))
 		{
@@ -172,7 +170,8 @@ static void read_config_value(const char *conf, const char *value_name, char *ds
 		}
 	}
 
-	fclose(f);
+	if (f)
+		fclose(f);
 
 	if (!found)
 	{
