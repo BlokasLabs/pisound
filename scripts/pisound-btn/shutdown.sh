@@ -18,17 +18,22 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
 
-WAS_ON=false
+. /usr/local/pisound/scripts/common/common.sh
 
-for btdev in `gdbus introspect --system --dest org.bluez --object-path / --recurse | grep hci | grep -e '/hci[0..9]* ' | awk '/^ *node /{print $2}'`; do
-	if [ "`gdbus call --system --dest org.bluez --object-path /org/bluez/hci0 --method org.freedesktop.DBus.Properties.Get org.bluez.Adapter1 'Discoverable'`" = "(<true>,)" ]; then
-		WAS_ON=true
-		break
-	fi
+log "Pisound button held for $2 ms, after $1 clicks!"
+
+if [ $1 -ne 1 ]; then
+	log "Ignoring hold after $1 clicks..."
+	exit 0
+fi
+
+aconnect -x
+
+for i in $(seq 1 10); do
+	flash_leds 1
+	sleep 0.1
 done
 
-if [ $WAS_ON = true ]; then
-	/usr/local/etc/pisound/set_bt_discoverable.sh false
-else
-	/usr/local/etc/pisound/set_bt_discoverable.sh true
-fi
+log "Shutting down."
+
+sudo shutdown now

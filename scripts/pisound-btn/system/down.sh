@@ -18,29 +18,9 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
 
-. /usr/local/etc/pisound/common.sh
+# This event is a bit spammy, and as of now unused. Feel free to customize.
 
-log "Pisound button double clicked!"
-aconnect -x
-flash_leds 1
+. /usr/local/pisound/scripts/common/common.sh
+#log "Pisound button down!"
 
-log "Killing all Pure Data instances!"
-
-for pd in `ps -C puredata --no-headers | awk '{print $1;}'`; do
-	log "Killing pid $pd..."
-	kill $pd
-done
-
-log "Syncing IO!"
-sync
-
-log "Unmounting all usb drives!"
-for usb_dev in /dev/disk/by-id/usb-*; do
-	dev=$(readlink -f $usb_dev)
-	grep -q ^$dev /proc/mounts && sudo umount $dev
-done
-
-log "Done, flashing led."
-flash_leds 10
-sleep 0.5
-flash_leds 10
+periodic_led_blink 10 1.0 /tmp/.pisound-down-pid

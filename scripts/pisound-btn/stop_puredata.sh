@@ -18,18 +18,20 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
 
-CURRENT_SCRIPT_DIR=$(dirname $(readlink -f $0))
 
-. /usr/local/etc/pisound/common.sh
+. /usr/local/pisound/scripts/common/common.sh
+. /usr/local/pisound/scripts/common/stop_puredata.sh
 
-log "Pisound button clicked $1 times!"
+stop_puredata
 
-if [ $1 -eq 1 ]; then
-	$CURRENT_SCRIPT_DIR/single_click.sh
-elif [ $1 -eq 2 ]; then
-	$CURRENT_SCRIPT_DIR/double_click.sh
-elif [ $1 -eq 3 ]; then
-	$CURRENT_SCRIPT_DIR/triple_click.sh
-else
-	log "No action for $1 clicks"
-fi
+log "Syncing IO!"
+sync
+
+log "Unmounting all usb drives!"
+for usb_dev in /dev/disk/by-id/usb-*; do
+	dev=$(readlink -f $usb_dev)
+	grep -q ^$dev /proc/mounts && sudo umount $dev
+done
+
+sleep 0.5
+flash_leds 10

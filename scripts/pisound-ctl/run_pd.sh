@@ -18,22 +18,5 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
 
-. /usr/local/etc/pisound/common.sh
-
-log "Pisound button held for $2 ms, after $1 clicks!"
-
-if [ $1 -ne 1 ]; then
-	log "Ignoring hold after $1 clicks..."
-	exit 0
-fi
-
-aconnect -x
-
-for i in $(seq 1 10); do
-	flash_leds 1
-	sleep 0.1
-done
-
-log "Shutting down."
-
-sudo shutdown now
+. /usr/local/pisound/scripts/common/start_puredata.sh
+start_puredata $1

@@ -34,14 +34,15 @@
 #define HOMEPAGE_URL "https://blokas.io/pisound"
 #define UPDATE_URL   HOMEPAGE_URL "/updates?btnv=%x.%02x&v=%s&sn=%s&id=%s"
 
-enum { PISOUND_BTN_VERSION     = 0x0104 };
+enum { PISOUND_BTN_VERSION     = 0x0105 };
 enum { INVALID_VERSION         = 0xffff };
 enum { BUTTON_PIN              = 17     };
 enum { CLICK_TIMEOUT_MS        = 400    };
 enum { HOLD_PRESS_TIMEOUT_MS   = CLICK_TIMEOUT_MS };
 enum { PRESS_COUNT_LIMIT       = 8      };
 
-#define BASE_SCRIPTS_DIR "/usr/local/etc/pisound"
+#define BASE_PISOUND_DIR "usr/local/pisound"
+#define BASE_SCRIPTS_DIR BASE_PISOUND_DIR "/scripts/pisound-btn"
 
 enum action_e
 {
@@ -57,10 +58,10 @@ enum action_e
 static const char *const DOWN_VALUE_NAME           = "DOWN";
 static const char *const UP_VALUE_NAME             = "UP";
 
-static const char *const SINGLE_CLICK_VALUE_NAME   = "SINGLE_CLICK";
-static const char *const DOUBLE_CLICK_VALUE_NAME   = "DOUBLE_CLICK";
-static const char *const TRIPLE_CLICK_VALUE_NAME   = "TRIPLE_CLICK";
-static const char *const OTHER_CLICKS_VALUE_NAME   = "OTHER_CLICKS";
+static const char *const CLICK_1_VALUE_NAME        = "CLICK_1";
+static const char *const CLICK_2_VALUE_NAME        = "CLICK_2";
+static const char *const CLICK_3_VALUE_NAME        = "CLICK_3";
+static const char *const CLICK_OTHER_VALUE_NAME    = "CLICK_OTHER";
 
 static const char *const HOLD_1S_VALUE_NAME        = "HOLD_1S";
 static const char *const HOLD_3S_VALUE_NAME        = "HOLD_3S";
@@ -71,23 +72,23 @@ static const char *const PISOUND_ID_FILE           = "/sys/kernel/pisound/id";
 static const char *const PISOUND_SERIAL_FILE       = "/sys/kernel/pisound/serial";
 static const char *const PISOUND_VERSION_FILE      = "/sys/kernel/pisound/version";
 
-static const char *const UPDATE_CHECK_DISABLE_FILE = BASE_SCRIPTS_DIR "/disable_update_check"; // If the file exists, the update check will be disabled.
+static const char *const UPDATE_CHECK_DISABLE_FILE = BASE_PISOUND_DIR "/disable_update_check"; // If the file exists, the update check will be disabled.
 
-static const char *const DEFAULT_DOWN              = BASE_SCRIPTS_DIR "/down.sh";
-static const char *const DEFAULT_UP                = BASE_SCRIPTS_DIR "/up.sh";
+static const char *const DEFAULT_DOWN              = BASE_SCRIPTS_DIR "/system/down.sh";
+static const char *const DEFAULT_UP                = BASE_SCRIPTS_DIR "/system/up.sh";
 
-static const char *const DEFAULT_SINGLE_CLICK      = BASE_SCRIPTS_DIR "/start_puredata.sh";
-static const char *const DEFAULT_DOUBLE_CLICK      = BASE_SCRIPTS_DIR "/stop_puredata.sh";
-static const char *const DEFAULT_TRIPLE_CLICK      = BASE_SCRIPTS_DIR "/toggle_wifi_hotspot.sh";
+static const char *const DEFAULT_CLICK_1           = BASE_SCRIPTS_DIR "/start_puredata.sh";
+static const char *const DEFAULT_CLICK_2           = BASE_SCRIPTS_DIR "/stop_puredata.sh";
+static const char *const DEFAULT_CLICK_3           = BASE_SCRIPTS_DIR "/toggle_wifi_hotspot.sh";
 
 // Receives 'times clicked' argument.
-static const char *const DEFAULT_OTHER_CLICKS      = BASE_SCRIPTS_DIR "/click.sh";
+static const char *const DEFAULT_CLICK_OTHER       = BASE_SCRIPTS_DIR "/do_nothing.sh";
 
 // Receive 'held after n clicks' and 'time held' arguments.
-static const char *const DEFAULT_HOLD_1S           = BASE_SCRIPTS_DIR "/hold.sh";
+static const char *const DEFAULT_HOLD_1S           = BASE_SCRIPTS_DIR "/do_nothing.sh";
 static const char *const DEFAULT_HOLD_3S           = BASE_SCRIPTS_DIR "/toggle_bt_discoverable.sh";
 static const char *const DEFAULT_HOLD_5S           = BASE_SCRIPTS_DIR "/shutdown.sh";
-static const char *const DEFAULT_HOLD_OTHER        = BASE_SCRIPTS_DIR "/shutdown.sh";
+static const char *const DEFAULT_HOLD_OTHER        = BASE_SCRIPTS_DIR "/do_nothing.sh";
 
 // Arbitrarily chosen limit.
 enum { MAX_PATH_LENGTH = 4096 };
@@ -152,6 +153,7 @@ static void read_config_value(const char *conf, const char *value_name, char *ds
 							strncpy(dst, value, len);
 							dst[len] = '\0';
 							found = true;
+							break;
 						}
 						else
 						{
@@ -195,20 +197,20 @@ static void get_default_action_and_script(enum action_e action, unsigned arg0, u
 		switch (arg0)
 		{
 		case 1:
-			*name = SINGLE_CLICK_VALUE_NAME;
-			*script = DEFAULT_SINGLE_CLICK;
+			*name = CLICK_1_VALUE_NAME;
+			*script = DEFAULT_CLICK_1;
 			break;
 		case 2:
-			*name = DOUBLE_CLICK_VALUE_NAME;
-			*script = DEFAULT_DOUBLE_CLICK;
+			*name = CLICK_2_VALUE_NAME;
+			*script = DEFAULT_CLICK_2;
 			break;
 		case 3:
-			*name = TRIPLE_CLICK_VALUE_NAME;
-			*script = DEFAULT_TRIPLE_CLICK;
+			*name = CLICK_3_VALUE_NAME;
+			*script = DEFAULT_CLICK_3;
 			break;
 		default:
-			*name = OTHER_CLICKS_VALUE_NAME;
-			*script = DEFAULT_OTHER_CLICKS;
+			*name = CLICK_OTHER_VALUE_NAME;
+			*script = DEFAULT_CLICK_OTHER;
 			break;
 		}
 		break;

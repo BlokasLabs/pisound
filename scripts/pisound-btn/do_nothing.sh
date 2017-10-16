@@ -18,25 +18,4 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
 
-. /usr/local/etc/pisound/common.sh
-
-log "Pisound button triple clicked!"
-flash_leds 1
-
-if ps -e | grep -q hostapd; then
-	log "Disabling Access point..."
-	sh /usr/local/etc/pisound/disable_access_point.sh
-	killall touchosc2midi
-
-	flash_leds 20
-	sleep 0.5
-	flash_leds 20
-else
-	log "Enabling Access point..."
-	sh /usr/local/etc/pisound/enable_access_point.sh
-	if which touchosc2midi; then
-		nohup touchosc2midi --ip=172.24.1.1 > /dev/null 2>&1 &
-	fi
-
-	flash_leds 20
-fi
+# Succesfully doing nothing ...
