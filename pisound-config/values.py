@@ -14,10 +14,9 @@ def get_username():
     return username
 
 def prepare_btn_config():
-    keys = ['SINGLE_CLICK', 'DOUBLE_CLICK', 'TRIPLE_CLICK', 
-        'OTHER_CLICKS', 'HOLD_1S', 'HOLD_1S', 'HOLD_3S', 'HOLD_5S', 'HOLD_OTHER']
+    keys = ['CLICK_1', 'CLICK_2', 'CLICK_3', 
+        'CLICK_OTHER', 'HOLD_1S', 'HOLD_3S', 'HOLD_5S', 'HOLD_OTHER']
 
-    keys = sorted(keys)
     
     if not isfile(settings.BTN_CFG):
             with open(settings.BTN_CFG, 'w') as f:
@@ -30,12 +29,18 @@ def prepare_btn_config():
         for key in keys:
                 if str(key) not in data:
                     missing_keys.append(key)
-    
-    for key in missing_keys:
-        data += str(key + '\t' + settings.BTN_SCRIPTS_DIR + '/do_nothing.sh' '\n')
 
-    with open(settings.BTN_CFG, 'w') as f:
-        f.write(data)
+    with open(settings.BTN_CFG, 'r') as f:
+        lines = f.readlines()
+    
+    if len(missing_keys) > 0:
+        for key in missing_keys:
+            lines.append(str(key + '\t' + settings.BTN_SCRIPTS_DIR + '/do_nothing.sh' '\n'))
+
+        with open(settings.BTN_CFG, 'w') as f:
+            f.writelines(sorted(lines))
+
+prepare_btn_config()
 
 def get_btn_config():
     prepare_btn_config()
