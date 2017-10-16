@@ -18,9 +18,25 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
 
-# This event is a bit spammy, and as of now unused. Feel free to customize.
+. /usr/local/pisound/scripts/common/common.sh
 
-. /usr/local/etc/pisound/common.sh
-#log "Pisound button up!"
+log "Pisound button triple clicked!"
+flash_leds 1
 
-periodic_led_blink 0 0 /tmp/.pisound-down-pid
+if ps -e | grep -q hostapd; then
+	log "Disabling Access point..."
+	sh /usr/local/pisound/scripts/pisound-btn/disable_wifi_hotspot.sh
+	killall touchosc2midi
+
+	flash_leds 20
+	sleep 0.5
+	flash_leds 20
+else
+	log "Enabling Access point..."
+	sh /usr/local/pisound/scripts/pisound-btn/enable_wifi_hotspot.sh
+	if which touchosc2midi; then
+		nohup touchosc2midi --ip=172.24.1.1 > /dev/null 2>&1 &
+	fi
+
+	flash_leds 20
+fi

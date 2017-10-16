@@ -17,30 +17,23 @@
 #
 
 BINARY_DIR ?= /usr/local/bin
-SCRIPTS_DIR ?= /usr/local/etc/pisound
-PATCHES_DIR ?= /usr/local/etc/pisound-patches
-CURRENT_DATE := $(shell date +"%F.%T")
-BACKUP_DIR ?= /usr/local/etc/pisound-backups/$(CURRENT_DATE)
+PISOUND_DIR ?= /usr/local/pisound
+PATCHES_DIR ?= /usr/local/pisound-patches
 
 all: pisound-btn
 
 pisound-btn: pisound-btn.c
 	gcc pisound-btn.c -o pisound-btn
+	strip pisound-btn
 
-backup-scripts:
-	@if test -e $(SCRIPTS_DIR); then \
-		echo "Backing up scripts in $(SCRIPTS_DIR) to $(BACKUP_DIR)"; \
-		mkdir -p $(BACKUP_DIR); \
-		if test -e $(SCRIPTS_DIR)/backups; then \
-			echo "Migrating $(SCRIPTS_DIR)/backups to $(BACKUP_DIR)"; \
-			mv $(SCRIPTS_DIR)/backups/* $(BACKUP_DIR)/; \
-			rm -r $(SCRIPTS_DIR)/backups/; \
-		fi; \
-		mv $(SCRIPTS_DIR)/* $(BACKUP_DIR)/; \
-		if test -e /etc/pisound.conf; then cp /etc/pisound.conf $(BACKUP_DIR)/; fi; \
+$(PISOUND_DIR):
+	@if [ ! -d $(PISOUND_DIR) ]; then \
+		echo 'Copying this git repository to $(PISOUND_DIR)'; \
+		mkdir -p $(PISOUND_DIR); \
+		cp -r ../. $(PISOUND_DIR); \
 	fi
 
-install: all backup-scripts
+install: all $(PISOUND_DIR) # backup-scripts
 	@if test -e /etc/init.d/pisound-btn; then \
 		update-rc.d pisound-btn remove; \
 		/etc/init.d/pisound-btn stop; \
@@ -48,17 +41,25 @@ install: all backup-scripts
 	@killall -PIPE pisound-btn > /dev/null 2>&1 || true
 	@systemctl stop pisound-btn > /dev/null 2>&1 || true
 	@cp pisound-btn $(BINARY_DIR)/
-	@mkdir -p $(SCRIPTS_DIR)
 	@mkdir -p $(PATCHES_DIR)
 	@chmod 777 $(PATCHES_DIR)
-	@cp -pr scripts/*  $(SCRIPTS_DIR)/ && chmod +x $(SCRIPTS_DIR)/*.sh
-	@cp -p pisound-btn.service /etc/systemd/system/
+	@cp -p pisound-btn.service /usr/lib/systemd/system/
 	@cp -p pisound.conf /etc/
 	@systemctl daemon-reload > /dev/null 2>&1
 	@systemctl enable pisound-btn > /dev/null 2>&1
 	@systemctl start pisound-btn > /dev/null 2>&1
 
 clean:
-	rm -f pisound-btn
+	rm -f pisound-btn pisound-btn.deb
+	rm -rf debian/usr/bin/pisound-btn debian/etc
+	gunzip `find . | grep gz` > /dev/null 2>&1 || true
 
-.PHONY: backup-scripts
+pisound-btn.deb: pisound-btn
+	@gzip --best -n ./debian/usr/share/doc/pisound-btn/changelog ./debian/usr/share/doc/pisound-btn/changelog.Debian ./debian/usr/share/man/man1/pisound-btn.1
+	@mkdir -p debian/usr/bin
+	@cp pisound-btn debian/usr/bin/
+	@mkdir -p debian/etc
+	@cp pisound.conf debian/etc/
+	@fakeroot dpkg --build debian
+	@mv debian.deb pisound-btn.deb
+	@gunzip `find . | grep gz` > /dev/null 2>&1

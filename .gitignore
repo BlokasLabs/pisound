@@ -42,3 +42,7 @@ pisound-btn
 !pisound-btn/
 *.dtbo
 .tmp_versions
+
+**/__pycache__/*
+**/.vscode/*
+**/.DS_STORE/*

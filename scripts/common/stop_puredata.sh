@@ -1,5 +1,7 @@
-# Pisound card support code.
-# Copyright (C) 2017  Vilniaus Blokas UAB, http://blokas.io/pisound
+#!/bin/sh
+
+# pisound-btn daemon for the Pisound button.
+# Copyright (C) 2017  Vilniaus Blokas UAB, https://blokas.io/pisound
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -16,15 +18,16 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
 
-SUBDIRS := pisound-btn
+. /usr/local/pisound/scripts/common/common.sh
 
-all: $(SUBDIRS)
+stop_puredata()
+{
+	aconnect -x
+	flash_leds 1
 
-clean: $(SUBDIRS)
+	log "Killing all Pure Data instances!"
+	killall puredata
 
-install: $(SUBDIRS)
-
-$(SUBDIRS):
-	$(MAKE) -C $@ $(MAKECMDGOALS)
-
-.PHONY: $(SUBDIRS)
+	log "Done, flashing LEDs."
+	flash_leds 10
+}

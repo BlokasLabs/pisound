@@ -1,5 +1,7 @@
-# Pisound card support code.
-# Copyright (C) 2017  Vilniaus Blokas UAB, http://blokas.io/pisound
+#!/bin/sh
+
+# pisound-btn daemon for the Pisound button.
+# Copyright (C) 2017  Vilniaus Blokas UAB, https://blokas.io/pisound
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -16,15 +18,9 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
 
-SUBDIRS := pisound-btn
+# This event is a bit spammy, and as of now unused. Feel free to customize.
 
-all: $(SUBDIRS)
+. /usr/local/pisound/scripts/common/common.sh
+#log "Pisound button up!"
 
-clean: $(SUBDIRS)
-
-install: $(SUBDIRS)
-
-$(SUBDIRS):
-	$(MAKE) -C $@ $(MAKECMDGOALS)
-
-.PHONY: $(SUBDIRS)
+periodic_led_blink 0 0 /tmp/.pisound-down-pid

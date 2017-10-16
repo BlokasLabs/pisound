@@ -76,3 +76,15 @@ periodic_led_blink() {
 		echo 2 or 3 arguments must be specified! 1>&2
 	fi
 }
+
+# Waits until the given process terminates.
+wait_process() {
+	if [ "$#" -ne 1 ]; then
+		echo 1 argument must be specified! 1>&2
+		return
+	fi
+	while true; do
+		wait $1
+		kill -0 $1 2> /dev/null || break
+	done
+}

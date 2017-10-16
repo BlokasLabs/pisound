@@ -18,9 +18,4 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
 
-# This event is a bit spammy, and as of now unused. Feel free to customize.
-
-. /usr/local/etc/pisound/common.sh
-#log "Pisound button down!"
-
-periodic_led_blink 10 1.0 /tmp/.pisound-down-pid
+find /usr/local/puredata-patches/ -type f -name "main.pd"

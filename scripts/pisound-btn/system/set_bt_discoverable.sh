@@ -23,7 +23,7 @@ if [ "$1" != "true" ] && [ "$1" != "false" ]; then
 	exit 1
 fi
 
-. /usr/local/etc/pisound/common.sh
+. /usr/local/pisound/scripts/common/common.sh
 
 periodic_led_blink 0 0
 

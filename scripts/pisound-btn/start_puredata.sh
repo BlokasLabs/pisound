@@ -18,24 +18,9 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
 
-PURE_DATA_STARTUP_SLEEP=3
 
-export XAUTHORITY=/home/pi/.Xauthority
-export DISPLAY=:0
-
-. /usr/local/etc/pisound/common.sh
-
-log "Pisound button single clicked!"
-aconnect -x
-flash_leds 1
-
-PURE_DATA=`which puredata`
-
-if [ -z $PURE_DATA ]; then
-	log "Pure Data was not found! Install by running: sudo apt-get install puredata"
-	flash_leds 100
-	exit 1
-fi
+. /usr/local/pisound/scripts/common/common.sh
+. /usr/local/pisound/scripts/common/start_puredata.sh
 
 log "Searching for main.pd in USB storage!"
 
@@ -64,8 +49,8 @@ if [ -z "$PURE_DATA_PATCH" ]; then
 	PURE_DATA_PATCH=`find /media 2> /dev/null | grep main.pd | head -1`
 
 	if [ -z "$PURE_DATA_PATCH" ]; then
-		log "No patch found in attached media, checking /usr/local/etc/pisound-patches..."
-		PURE_DATA_PATCH=`find /usr/local/etc/pisound-patches/ 2> /dev/null | grep main.pd | head -1`
+		log "No patch found in attached media, checking /usr/local/puredata-patches..."
+		PURE_DATA_PATCH=`find /usr/local/puredata-patches/ 2> /dev/null | grep main.pd | head -1`
 	fi
 fi
 
@@ -78,47 +63,6 @@ else
 	log "Found patch: $PURE_DATA_PATCH"
 fi
 
-log "Killing all Pure Data instances!"
-
-for pd in `ps -C puredata --no-headers | awk '{print $1;}'`; do
-	log "Killing pid $pd..."
-	kill $pd
-done
-
 log "All sanity checks succeeded."
 
-log "Launching Pure Data."
-nohup puredata -alsa -audioadddev pisound -alsamidi -channels 2 -r 48000 -mididev 1 -send ";pd dsp 1" "$PURE_DATA_PATCH" > /dev/null 2>&1 &
-
-if [ $? -eq 0 ]; then
-	log "Pure Data started successfully!"
-else
-	log "Pure Data failed to start!"
-	flash_leds 100
-	exit 1
-fi
-
-log "Giving $PURE_DATA_STARTUP_SLEEP seconds for Pure Data to start up before connecting MIDI ports."
-sleep $PURE_DATA_STARTUP_SLEEP
-
-READABLE_PORTS=`aconnect -i | egrep -iv "(Through|Pure Data|System)" | egrep -o "[0-9]+:" | egrep -o "[0-9]+"`
-
-RANGE="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15"
-
-sleep 0.3
-log "Pure Data started!"
-flash_leds 1
-sleep 0.3
-flash_leds 1
-sleep 0.3
-flash_leds 1
-
-log "Connecting all MIDI ports to and from Pure Data."
-
-# After connecting the ports, we can no longer flash the MIDI out LED.
-for p in $READABLE_PORTS; do
-	for i in $RANGE; do
-		aconnect $p:$i "Pure Data" 2> /dev/null;
-		aconnect "Pure Data:1" $p:$i 2> /dev/null;
-	done;
-done
+start_puredata "$PURE_DATA_PATCH" &
