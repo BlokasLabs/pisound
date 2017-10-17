@@ -1,3 +1,9 @@
+pisound-btn (1.05-2) jessie; urgency=medium
+
+  * A hotfix for taking care of /etc/systemd/system/pisound-btn.service left over from 1.04 version.
+
+ -- Giedrius Trainavičius <giedrius@blokas.io>  Wed, 18 Oct 2017 01:02:15 +0200
+
 pisound-btn (1.05-1) jessie; urgency=medium
 
   * Initial pisound-btn as deb package release.
