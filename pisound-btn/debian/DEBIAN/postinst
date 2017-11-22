@@ -6,9 +6,6 @@ else
 	cd /usr/local/pisound && git pull
 fi
 
-echo "Installing python urwid library..."
-pip3 install urwid
-
 if [ -e "/usr/local/bin/pisound-btn" ]; then
 	echo "Deleting locally built pisound-btn, so that the packaged version is preferred."
 	rm -f "/usr/local/bin/pisound-btn"
