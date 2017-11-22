@@ -1,3 +1,9 @@
+pisound-btn (1.05-3) jessie; urgency=medium
+
+  * A minor update fixing encoding and background issues of pisound-config. Simplified dependencies for quicker install.
+
+ -- Giedrius Trainavičius <giedrius@blokas.io>  Thu, 23 Nov 2017 00:57:13 +0200
+
 pisound-btn (1.05-2) jessie; urgency=medium
 
   * A hotfix for taking care of /etc/systemd/system/pisound-btn.service left over from 1.04 version.
