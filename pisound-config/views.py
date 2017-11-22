@@ -3,20 +3,21 @@ import urwid
 
 
 palette = [('body','white','black'),
-    ('content', 'dark blue', 'white'),
     ('focustext', 'black','yellow'),
     ('field', 'white', 'dark gray'),
-    ('footer', 'white','black'),
-    ('love', 'light red', 'black'),
+    ('love', 'light red, bold', 'black'),
     ('title', 'white, bold', 'black')]
 
 def prepare(content, title='Info'):
-    title = urwid.AttrMap(urwid.Text(('title', title + '\n')), '')
-    footer_text = 'by Blokas Community! ESC to EXIT'.encode('utf8')
-    w = urwid.Frame(content, header=title, footer=urwid.AttrMap(urwid.Text([('footer', '\nwith'.encode('utf8')), 
-        ('love', ' ❤ '.encode('utf8')),('footer', footer_text)]),''))
+    footer_text = 'by Blokas Community! ESC to EXIT'
+    w = urwid.Frame(
+        content,
+        header=urwid.Text(('title', title + '\n')), 
+        footer=urwid.Text(['\nwith', ('love', ' love '), footer_text])
+    )
     w = urwid.Padding(w, 'center', ('relative', 80))
     w = urwid.Filler(w, 'middle', ('relative', 80))
+    w = urwid.AttrMap(w, 'body')
     return w
 
 def add_back_button(parent, title='Back'):
@@ -105,10 +106,10 @@ def run_sh(loop, selection, title, path, parent=False):
     cmd=['chmod','+x', path]
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     cmd=['sh', path]
-    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    p = subprocess.Popen(cmd, bufsize=1, universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     info = ''
-    for line in p.stdout:
-        line = str(line, 'utf8').strip()
+    for line in iter(p.stdout.readline,''):
+        line = str(line).strip()
         info = info + line + '\n'
         text.set_text(info)
-        loop.draw_screen()
+        loop.draw_screen()   
