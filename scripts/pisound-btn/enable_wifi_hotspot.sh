@@ -29,4 +29,5 @@ sudo iptables -A FORWARD -i eth0 -o wlan0 -m state --state RELATED,ESTABLISHED -
 sudo iptables -A FORWARD -i wlan0 -o eth0 -j ACCEPT
 sudo sh -c "echo 1 > /proc/sys/net/ipv4/ip_forward"
 sudo dnsmasq -C $SCRIPT_PATH/dnsmasq.conf
+(sleep 15 && sudo systemctl restart avahi-daemon) &
 sudo nohup /usr/sbin/hostapd $SCRIPT_PATH/hostapd.conf > /dev/null 2>&1 &

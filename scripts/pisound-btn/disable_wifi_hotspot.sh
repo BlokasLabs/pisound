@@ -26,3 +26,4 @@ sudo sh -c "echo | iptables-restore"
 sudo sh -c "echo 0 > /proc/sys/net/ipv4/ip_forward"
 sudo iwlist wlan0 scan > /dev/null 2>&1
 sudo ifup wlan0
+sudo systemctl restart avahi-daemon
