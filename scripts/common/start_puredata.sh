@@ -20,8 +20,14 @@
 
 PURE_DATA_STARTUP_SLEEP=3
 
-export XAUTHORITY=/home/pi/.Xauthority
-export DISPLAY=:0
+# If there's X server running
+if DISPLAY=:0 xhost > /dev/null 2>&1; then
+	export XAUTHORITY=/home/pi/.Xauthority
+	export DISPLAY=:0
+	unset NO_GUI
+else
+	NO_GUI=-nogui
+fi
 
 . /usr/local/pisound/scripts/common/common.sh
 
@@ -56,8 +62,11 @@ start_puredata()
 		done
 	) &
 
+	PATCH="$1"
+	shift
+
 	log "Launching Pure Data."
-	puredata -stderr -alsa -audioadddev pisound -alsamidi -channels 2 -r 48000 -mididev 1 -send ";pd dsp 1" $@ &
+	puredata -stderr -alsa -audioadddev pisound -alsamidi -channels 2 -r 48000 $NO_GUI -mididev 1 -send ";pd dsp 1" "$PATCH" $@ &
 	PD_PID=$!
 
 	log "Pure Data started!"
