@@ -1,3 +1,9 @@
+pisound-btn (1.05-4)
+
+* A minor update moving libglib2.0-bin dependency from pisound-ctl to pisound-btn.
+
+-- Giedrius Trainavičius <giedrius@blokas.io>  Wed, 14 Mar 2018 15:14:20 +0200
+
 pisound-btn (1.05-3)
 
 * A minor update fixing encoding and background issues of pisound-config. Simplified dependencies for quicker install.
