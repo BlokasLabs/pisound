@@ -20,8 +20,10 @@
 
 SCRIPT_PATH=$(dirname $(readlink -f $0))
 
+sudo rfkill unblock wifi
+sudo wpa_cli -i wlan0 disconnect
 sudo dhcpcd --denyinterfaces wlan0
-sudo ifdown wlan0
+sudo ifconfig wlan0 down
 sudo ifconfig wlan0 172.24.1.1 netmask 255.255.255.0 broadcast 172.24.1.255
 sudo killall dnsmasq
 sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
