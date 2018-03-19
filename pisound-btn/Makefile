@@ -23,7 +23,7 @@ PATCHES_DIR ?= /usr/local/pisound-patches
 all: pisound-btn
 
 pisound-btn: pisound-btn.c
-	gcc pisound-btn.c -o pisound-btn
+	gcc-4.9 pisound-btn.c -o pisound-btn
 	strip pisound-btn
 
 $(PISOUND_DIR):
