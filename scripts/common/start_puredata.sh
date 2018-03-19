@@ -20,16 +20,16 @@
 
 PURE_DATA_STARTUP_SLEEP=3
 
+. /usr/local/pisound/scripts/common/common.sh
+
 # If there's X server running
-if DISPLAY=:0 xhost > /dev/null 2>&1; then
+if DISPLAY=$(find_display); then
 	export XAUTHORITY=/home/pi/.Xauthority
-	export DISPLAY=:0
+	export DISPLAY
 	unset NO_GUI
 else
 	NO_GUI=-nogui
 fi
-
-. /usr/local/pisound/scripts/common/common.sh
 
 start_puredata()
 {

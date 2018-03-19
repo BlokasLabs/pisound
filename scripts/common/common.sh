@@ -88,3 +88,16 @@ wait_process() {
 		kill -0 $1 2> /dev/null || break
 	done
 }
+
+# Find first X display.
+find_display() {
+	display=$(ps ea | grep -Po "DISPLAY=[\.0-9A-Za-z:]* " | sort -u | head -n 1 | grep -oe :.*)
+	if [ -z $display ]; then
+		# Not found.
+		return 1
+	else
+		# Found something.
+		echo $display
+		return 0
+	fi
+}
