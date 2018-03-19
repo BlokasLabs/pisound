@@ -1,3 +1,11 @@
+pisound-btn (1.05-5) jessie; urgency=medium
+
+  * Locked gcc version used for building pisound-btn to 4.9.
+  * Improved pisound repository update logic by stashing any local changes.
+
+ -- Giedrius Trainavičius <giedrius@blokas.io>  Mon, 18 Mar 2018 02:17:10 +0200
+
+
 pisound-btn (1.05-4) jessie; urgency=medium
 
   * A minor update moving libglib2.0-bin dependency from pisound-ctl to pisound-btn.

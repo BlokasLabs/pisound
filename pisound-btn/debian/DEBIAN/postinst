@@ -3,7 +3,7 @@ if [ ! -d "/usr/local/pisound" ]; then
 	git clone https://github.com/BlokasLabs/pisound.git /usr/local/pisound
 else
 	echo "Updating pisound repository with latest stuff in https://github.com/BlokasLabs/pisound..."
-	cd /usr/local/pisound && git pull
+	cd /usr/local/pisound && git -c user.name="apt-get" -c user.email="apt@get" stash && git pull
 fi
 
 if [ -e "/usr/local/bin/pisound-btn" ]; then
