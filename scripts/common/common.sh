@@ -91,6 +91,13 @@ wait_process() {
 
 # Find first X display.
 find_display() {
+	# If HDMI display is connected, try default :0 manually.
+	if [ "$(tvservice -n 2>&1)" != "[E] No device present" ] && XAUTHORITY=/home/pi/.Xauthority DISPLAY=:0 xhost > /dev/null 2>&1; then
+		echo :0
+		return 0
+	fi
+
+	# HDMI display was unavailable, try finding another display (such as vnc) to use.
 	display=$(ps ea | grep -Po "DISPLAY=[\.0-9A-Za-z:]* " | sort -u | head -n 1 | grep -oe :.*)
 	if [ -z $display ]; then
 		# Not found.

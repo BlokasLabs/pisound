@@ -26,8 +26,10 @@ PURE_DATA_STARTUP_SLEEP=3
 if DISPLAY=$(find_display); then
 	export XAUTHORITY=/home/pi/.Xauthority
 	export DISPLAY
+	echo Using display $DISPLAY
 	unset NO_GUI
 else
+	echo No display found, specifying -nogui
 	NO_GUI=-nogui
 fi
 
