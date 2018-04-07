@@ -100,8 +100,14 @@ find_display() {
 	# HDMI display was unavailable, try finding another display (such as vnc) to use.
 	display=$(ps ea | grep -Po "DISPLAY=[\.0-9A-Za-z:]* " | sort -u | head -n 1 | grep -oe :.*)
 	if [ -z $display ]; then
-		# Not found.
-		return 1
+		if [ -z $PISOUND_DISPLAY ]; then
+			# Not found.
+			return 1
+		else
+			# Fallback to value set in PISOUND_DISPLAY
+			echo $PISOUND_DISPLAY
+			return 0
+		fi
 	else
 		# Found something.
 		echo $display
