@@ -65,10 +65,11 @@ start_puredata()
 	) &
 
 	PATCH="$1"
+	PATCH_DIR=$(dirname "$PATCH")
 	shift
 
 	log "Launching Pure Data."
-	puredata -stderr -alsa -audioadddev pisound -alsamidi -channels 2 -r 48000 $NO_GUI -mididev 1 -send ";pd dsp 1" "$PATCH" $@ &
+	cd "$PATCH_DIR" && puredata -stderr -alsa -audioadddev pisound -alsamidi -channels 2 -r 48000 $NO_GUI -mididev 1 -send ";pd dsp 1" "$PATCH" $@ &
 	PD_PID=$!
 
 	log "Pure Data started!"
