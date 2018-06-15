@@ -3,9 +3,9 @@ Priority: optional
 Homepage: https://blokas.io/pisound
 Standards-Version: 3.9.2
 Package: pisound
-Version: 1.02-2
+Version: 1.03-1
 Architecture: all
 Maintainer: Blokas Labs <hello@blokas.io>
-Depends: pisound-btn (>= 1.05-5), pisound-ctl (>= 1.02-2)
+Depends: pisound-btn (>= 1.05-5), pisound-ctl (>= 1.03-1)
 Description: Pisound meta package. 
  Combines individual Pisound packages under single name.
