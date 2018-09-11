@@ -38,13 +38,24 @@ def btn_menu(button, *selection):
     description = "Here you can assign different "\
         "actions to different Button interactions. We know it sounds funny."\
         "\n\n'OTHER_CLICKS' - when 4 and more consecutive clicks are received."\
-        "\n'HOLD_OTHER' - when pressed for 7 and more seconds."
+        "\n'HOLD_OTHER' - when pressed for 7 and more seconds."\
+        "\n'CLICK_COUNT_LIMIT' - the maximum press count limit. Use 0 for no limit."
     items = values.get_btn_config()
     callback = btn_action_menu
     parent = main_menu
     view = views.list_view(loop, title, description, items, callback, parent)
 
+def btn_param_menu(button, selection):
+    title = "Change '{}' value".format(selection['key'])
+    description = 'Enter a new value bellow:'
+    callback = btn_update_silent
+    parent = btn_menu
+    view = views.input(loop, selection, title, description, callback, parent)
+
 def btn_action_menu(button, selection):
+    if selection['key'] == 'CLICK_COUNT_LIMIT':
+        btn_param_menu(button, selection)
+        return
     interaction = selection['key']
     title = "Button '{}' Action".format(interaction)
     description = "To assign your own script, place it inside '{}' directory.".format(
@@ -57,7 +68,10 @@ def btn_action_menu(button, selection):
     view = views.list_view(loop, title, description, items, callback, parent)
 
 def btn_update_silent(button, selection):
-    values.update_btn_config(selection['key'], selection['value'])
+    val = selection['value']
+    if 'new_value' in selection:
+        val = selection['new_value']
+    values.update_btn_config(selection['key'], val)
     btn_menu(selection)
 
 def cards_menu(button, *selection):

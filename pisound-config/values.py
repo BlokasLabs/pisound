@@ -15,7 +15,7 @@ def get_username():
 
 def prepare_btn_config():
     keys = ['CLICK_1', 'CLICK_2', 'CLICK_3', 
-        'CLICK_OTHER', 'HOLD_1S', 'HOLD_3S', 'HOLD_5S', 'HOLD_OTHER']
+        'CLICK_OTHER', 'HOLD_1S', 'HOLD_3S', 'HOLD_5S', 'HOLD_OTHER', 'CLICK_COUNT_LIMIT']
 
     
     if not isfile(settings.BTN_CFG):
@@ -35,6 +35,9 @@ def prepare_btn_config():
     
     if len(missing_keys) > 0:
         for key in missing_keys:
+            if key == 'CLICK_COUNT_LIMIT':
+                lines.append(str(key + '\t' + '8' '\n'))
+                continue
             lines.append(str(key + '\t' + settings.BTN_SCRIPTS_DIR + '/do_nothing.sh' '\n'))
 
         with open(settings.BTN_CFG, 'w') as f:
@@ -60,7 +63,8 @@ def get_btn_config():
                     name = 'Not Set'
                 items.append({
                     'title': interaction + ': ' + name,
-                    'key': interaction
+                    'key': interaction,
+                    'value': name
                     })
     return items
 

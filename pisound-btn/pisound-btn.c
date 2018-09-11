@@ -34,12 +34,11 @@
 #define HOMEPAGE_URL "https://blokas.io/pisound"
 #define UPDATE_URL   HOMEPAGE_URL "/updates?btnv=%x.%02x&v=%s&sn=%s&id=%s"
 
-enum { PISOUND_BTN_VERSION     = 0x0105 };
+enum { PISOUND_BTN_VERSION     = 0x0106 };
 enum { INVALID_VERSION         = 0xffff };
 enum { BUTTON_PIN              = 17     };
 enum { CLICK_TIMEOUT_MS        = 400    };
 enum { HOLD_PRESS_TIMEOUT_MS   = CLICK_TIMEOUT_MS };
-enum { PRESS_COUNT_LIMIT       = 8      };
 
 #define BASE_PISOUND_DIR "usr/local/pisound"
 #define BASE_SCRIPTS_DIR BASE_PISOUND_DIR "/scripts/pisound-btn"
@@ -68,6 +67,8 @@ static const char *const HOLD_3S_VALUE_NAME        = "HOLD_3S";
 static const char *const HOLD_5S_VALUE_NAME        = "HOLD_5S";
 static const char *const HOLD_OTHER_VALUE_NAME     = "HOLD_OTHER";
 
+static const char *const CLICK_COUNT_LIMIT_VALUE_NAME = "CLICK_COUNT_LIMIT";
+
 static const char *const PISOUND_ID_FILE           = "/sys/kernel/pisound/id";
 static const char *const PISOUND_SERIAL_FILE       = "/sys/kernel/pisound/serial";
 static const char *const PISOUND_VERSION_FILE      = "/sys/kernel/pisound/version";
@@ -94,6 +95,10 @@ static const char *const DEFAULT_HOLD_OTHER        = BASE_SCRIPTS_DIR "/do_nothi
 enum { MAX_PATH_LENGTH = 4096 };
 
 static char g_config_path[MAX_PATH_LENGTH+1]  = "/etc/pisound.conf";
+
+enum { DEFAULT_CLICK_COUNT_LIMIT = 8 };
+
+static unsigned int g_click_count_limit = DEFAULT_CLICK_COUNT_LIMIT;
 
 // Reads a line, truncates it if needed, seeks to the next line.
 static bool read_line(FILE *f, char *buffer, size_t n)
@@ -631,7 +636,7 @@ static int run(void)
 				}
 				else
 				{
-					if (num_pressed < PRESS_COUNT_LIMIT)
+					if (g_click_count_limit == 0 || num_pressed < g_click_count_limit)
 						++num_pressed;
 				}
 
@@ -690,17 +695,54 @@ static void print_usage(void)
 {
 	printf("Usage: pisound-btn [options]\n"
 		"Options:\n"
-		"\t--help      Display the usage information.\n"
-		"\t--version   Show the version information.\n"
-		"\t--conf      Specify the path to configuration file to use. Default is /etc/pisound.conf.\n"
+		"\t--help               Display the usage information.\n"
+		"\t--version            Show the version information.\n"
+		"\t--conf               Specify the path to configuration file to use. Default is /etc/pisound.conf.\n"
+		"\t--press-count-limit  Set the press count limit. Use 0 for no limit. Default is 8.\n"
+		"\t-n                   Short for --click-count-limit.\n"
 		"\n"
 		);
 	print_version();
 }
 
+static bool parse_uint(unsigned int *dst, const char *src)
+{
+	char * endPtr;
+	uint32_t x = strtoul(src, &endPtr, 10);
+	if (endPtr == src || *endPtr != '\0')
+	{
+		*dst = 0;
+		return false;
+	}
+	*dst = x;
+	return true;
+}
+
+static bool read_config_uint(const char *conf, const char *value_name, unsigned int *dst, unsigned int default_value)
+{
+	char buffer[12];
+	read_config_value(conf, CLICK_COUNT_LIMIT_VALUE_NAME, buffer, sizeof(buffer), "#");
+	if (buffer[0] == '#') // No value was specified.
+	{
+		*dst = default_value;
+		return false;
+	}
+
+	if (parse_uint(dst, buffer))
+	{
+		return true;
+	}
+	else
+	{
+		*dst = default_value;
+		return false;
+	}
+}
+
 int main(int argc, char **argv)
 {
 	int i;
+	bool click_count_limit_specified = false;
 	for (i=1; i<argc; ++i)
 	{
 		if (strcmp(argv[i], "--help") == 0)
@@ -728,12 +770,42 @@ int main(int argc, char **argv)
 				return 1;
 			}
 		}
+		else if (strcmp(argv[i], "--click-count-limit") == 0 || strcmp(argv[i], "-n") == 0)
+		{
+			if (i + 1 < argc)
+			{
+				unsigned int x;
+				if (parse_uint(&x, argv[i+1]))
+				{
+					g_click_count_limit = x;
+					click_count_limit_specified = true;
+					++i;
+				}
+				else
+				{
+					printf("Failed parsing count argument for '%s'!\n", argv[i]);
+					print_usage();
+					return 1;
+				}
+			}
+			else
+			{
+				printf("Missing count argument for '%s'!\n", argv[i]);
+				print_usage();
+				return 1;
+			}
+		}
 		else
 		{
 			printf("Unknown option '%s'.\n", argv[i]);
 			print_usage();
 			return 1;
 		}
+	}
+
+	if (!click_count_limit_specified)
+	{
+		read_config_uint(g_config_path, CLICK_COUNT_LIMIT_VALUE_NAME, &g_click_count_limit, g_click_count_limit);
 	}
 
 	return run();

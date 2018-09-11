@@ -1,3 +1,10 @@
+pisound-btn (1.06-1)
+
+* Made the click count configurable via command line (-n, --click-count-limit args)
+  as well as /etc/pisound.conf (CLICK_COUNT_LIMIT variable), default is still 8.
+
+-- Giedrius Trainavičius <giedrius@blokas.io>  Tue, 11 Sep 2018 15:06:33 +0200
+
 pisound-btn (1.05-5)
 
 * Locked gcc version used for building pisound-btn to 4.9.
