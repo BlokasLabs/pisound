@@ -1,6 +1,6 @@
 /*
  * Pisound Linux kernel module.
- * Copyright (C) 2016-2017  Vilniaus Blokas UAB, https://blokas.io/pisound
+ * Copyright (C) 2016-2019  Vilniaus Blokas UAB, https://blokas.io/pisound
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -21,48 +21,46 @@
 /plugin/;
 
 #include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/pinctrl/rockchip.h>
 
 / {
-	compatible = "brcm,bcm2708";
+	compatible = "rockchip,rk3288";
 
 	fragment@0 {
-		target = <&spi0>;
-		__overlay__ {
-			status = "okay";
-		};
-	};
-
-	fragment@1 {
-		target = <&spidev0>;
+		target-path = "/sound-simple-card";
 		__overlay__ {
 			status = "disabled";
 		};
 	};
 
-	fragment@2 {
-		target = <&spidev1>;
+	fragment@1 {
+		target = <&spi2>;
 		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
 			status = "okay";
+			spidev@0 {
+				status="disabled";
+			};
+			spidev@1 {
+				status="okay";
+			};
+			pisound_spi: pisound_spi@0{
+				compatible = "blokaslabs,pisound-spi";
+				reg = <0>;
+				spi-max-frequency = <100000>;
+			};
+		};
+	};
+	
+	fragment@2 {
+		target = <&hdmi>;
+		__overlay__ {
+			hdmi-i2s-audio-disable;
 		};
 	};
 
 	fragment@3 {
-		target = <&spi0>;
-		__overlay__ {
-			#address-cells = <1>;
-			#size-cells = <0>;
-
-			pisound_spi: pisound_spi@0{
-				compatible = "blokaslabs,pisound-spi";
-				reg = <0>;
-				pinctrl-names = "default";
-				pinctrl-0 = <&spi0_pins>;
-				spi-max-frequency = <1000000>;
-			};
-		};
-	};
-
-	fragment@4 {
 		target-path = "/";
 		__overlay__ {
 			pcm5102a-codec {
@@ -73,48 +71,44 @@
 		};
 	};
 
+	fragment@4 {
+		target = <&pinctrl>;
+		__overlay__ {
+			pisound_pins: pisound_pins {
+				rockchip,pins =
+					<7 RK_PC6 RK_FUNC_GPIO &pcfg_pull_none>,
+					<7 RK_PB0 RK_FUNC_GPIO &pcfg_pull_none>,
+					<7 RK_PA7 RK_FUNC_GPIO &pcfg_pull_none>,
+					<7 RK_PC7 RK_FUNC_GPIO &pcfg_pull_none>,
+					<5 RK_PB3 RK_FUNC_GPIO &pcfg_pull_none>,
+					<5 RK_PC3 RK_FUNC_GPIO &pcfg_pull_none>,
+					<5 RK_PB4 RK_FUNC_GPIO &pcfg_pull_none>;
+			};
+		};
+	};
+
 	fragment@5 {
-		target = <&sound>;
+		target-path = "/sound-ext-card";
 		__overlay__ {
 			compatible = "blokaslabs,pisound";
 			i2s-controller = <&i2s>;
 			status = "okay";
 
-			pinctrl-0 = <&pisound_button_pins>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&pisound_pins>;
 
 			osr-gpios =
-				<&gpio 13 GPIO_ACTIVE_HIGH>,
-				<&gpio 26 GPIO_ACTIVE_HIGH>,
-				<&gpio 16 GPIO_ACTIVE_HIGH>;
+				<&gpio7 RK_PC6 GPIO_ACTIVE_HIGH>, // GP7C6
+				<&gpio7 RK_PB0 GPIO_ACTIVE_HIGH>, // GP7B0
+				<&gpio7 RK_PA7 GPIO_ACTIVE_HIGH>; // GP7A7
 
 			reset-gpios =
-				<&gpio 12 GPIO_ACTIVE_HIGH>,
-				<&gpio 24 GPIO_ACTIVE_HIGH>;
+				<&gpio7 RK_PC7 GPIO_ACTIVE_HIGH>, // GP7C7
+				<&gpio5 RK_PB3 GPIO_ACTIVE_HIGH>; // GP5B3
 
-			data_available-gpios = <&gpio 25 GPIO_ACTIVE_HIGH>;
+			data_available-gpios = <&gpio5 RK_PC3 GPIO_ACTIVE_HIGH>; // GP5C3
 
-			button-gpios = <&gpio 17 GPIO_ACTIVE_LOW>;
-		};
-	};
-
-	fragment@6 {
-		target = <&gpio>;
-		__overlay__ {
-			pinctrl-names = "default";
-			pinctrl-0 = <&pisound_button_pins>;
-
-			pisound_button_pins: pisound_button_pins {
-				brcm,pins = <17>;
-				brcm,function = <0>; // Input
-				brcm,pull = <2>; // Pull-Up
-			};
-		};
-	};
-
-	fragment@7 {
-		target = <&i2s>;
-		__overlay__ {
-			status = "okay";
+			button-gpios = <&gpio5 RK_PB4 GPIO_ACTIVE_LOW>; // GP5B4
 		};
 	};
 };

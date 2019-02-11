@@ -1,6 +1,6 @@
 /*
  * Pisound Linux kernel module.
- * Copyright (C) 2016-2017  Vilniaus Blokas UAB, https://blokas.io/pisound
+ * Copyright (C) 2016-2019  Vilniaus Blokas UAB, https://blokas.io/pisound
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -474,7 +474,7 @@ static void pisnd_work_handler(struct work_struct *work)
 			 * rate.
 			 */
 			now = jiffies;
-			out_buffer_used -=
+			out_buffer_used -= (now - last_transfer_at == 0) ? 0 :
 				(MIDI_BYTES_PER_SECOND / HZ) /
 				(now - last_transfer_at);
 			if (out_buffer_used < 0)
