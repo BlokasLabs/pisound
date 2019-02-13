@@ -35,7 +35,6 @@ fi
 
 start_puredata()
 {
-	aconnect -x
 	flash_leds 1
 
 	if [ -z `which puredata` ]; then
@@ -47,29 +46,12 @@ start_puredata()
 	log "Killing all Pure Data instances!"
 	killall puredata 2> /dev/null
 
-	(
-		log "Giving $PURE_DATA_STARTUP_SLEEP seconds for Pure Data to start up before connecting MIDI ports."
-		sleep $PURE_DATA_STARTUP_SLEEP
-
-		READABLE_PORTS=`aconnect -i | egrep -iv "(Through|Pure Data|System)" | egrep -o "[0-9]+:" | egrep -o "[0-9]+"`
-		RANGE="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15"
-
-		log "Connecting all MIDI ports to and from Pure Data."
-
-		for p in $READABLE_PORTS; do
-			for i in $RANGE; do
-				aconnect $p:$i "Pure Data" 2> /dev/null;
-				aconnect "Pure Data:1" $p:$i 2> /dev/null;
-			done;
-		done
-	) &
-
 	PATCH="$1"
 	PATCH_DIR=$(dirname "$PATCH")
 	shift
 
 	log "Launching Pure Data."
-	cd "$PATCH_DIR" && puredata -stderr -alsa -audioadddev pisound -alsamidi -channels 2 -r 48000 $NO_GUI -mididev 1 -send ";pd dsp 1" "$PATCH" $@ &
+	cd "$PATCH_DIR" && puredata -stderr $NO_GUI -send ";pd dsp 1" "$PATCH" $@ &
 	PD_PID=$!
 
 	log "Pure Data started!"
