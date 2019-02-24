@@ -4,3 +4,6 @@ if [ -d /run/systemd/system ] ; then
 	systemctl --system daemon-reload >/dev/null || true
 fi
 
+if [ abort-upgrade = "$1" && dpkg --compare-versions "$2" lt 1.06; then
+	dpkg-divert --package pisound-btn --remove --rename --divert /etc/default/hostapd.orig /etc/default/hostapd
+fi
