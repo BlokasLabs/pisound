@@ -1,4 +1,3 @@
-/etc/default/hostapd
 /etc/dnsmasq.d/dnsmasq.conf
 /etc/hostapd/hostapd.conf
 /etc/pisound.conf
