@@ -20,16 +20,25 @@
 
 SCRIPT_PATH=$(dirname $(readlink -f $0))
 
+. /usr/local/pisound/scripts/common/common.sh
+
+flash_leds 1
+log "Enabling Access point..."
+
 sudo rfkill unblock wifi
 sudo wpa_cli -i wlan0 disconnect
 sudo dhcpcd --denyinterfaces wlan0
 sudo ifconfig wlan0 down
 sudo ifconfig wlan0 172.24.1.1 netmask 255.255.255.0 broadcast 172.24.1.255
-sudo killall dnsmasq
+sudo systemctl stop dnsmasq
 sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
 sudo iptables -A FORWARD -i eth0 -o wlan0 -m state --state RELATED,ESTABLISHED -j ACCEPT
 sudo iptables -A FORWARD -i wlan0 -o eth0 -j ACCEPT
 sudo sh -c "echo 1 > /proc/sys/net/ipv4/ip_forward"
-sudo dnsmasq -C $SCRIPT_PATH/dnsmasq.conf
+sudo systemctl start dnsmasq
 (sleep 15 && sudo systemctl restart avahi-daemon) &
-sudo nohup /usr/sbin/hostapd $SCRIPT_PATH/hostapd.conf > /dev/null 2>&1 &
+sudo systemctl start hostapd
+
+sudo systemctl restart touchosc2midi 2>/dev/null
+
+flash_leds 20

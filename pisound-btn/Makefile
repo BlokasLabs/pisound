@@ -51,7 +51,7 @@ install: all $(PISOUND_DIR) # backup-scripts
 
 clean:
 	rm -f pisound-btn pisound-btn.deb
-	rm -rf debian/usr/bin/pisound-btn debian/etc
+	rm -rf debian/usr/bin/pisound-btn
 	gunzip `find . | grep gz` > /dev/null 2>&1 || true
 
 pisound-btn.deb: pisound-btn

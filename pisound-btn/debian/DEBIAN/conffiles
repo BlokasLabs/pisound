@@ -1,0 +1,3 @@
+/etc/dnsmasq.d/wifi-hotspot.conf
+/etc/hostapd/hostapd.conf
+/etc/pisound.conf

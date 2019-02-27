@@ -20,23 +20,12 @@
 
 . /usr/local/pisound/scripts/common/common.sh
 
-log "Pisound button triple clicked!"
-flash_leds 1
+log "Toggling WiFi hotspot!"
 
-if ps -e | grep -q hostapd; then
-	log "Disabling Access point..."
-	sh /usr/local/pisound/scripts/pisound-btn/disable_wifi_hotspot.sh
-	killall touchosc2midi
-
-	flash_leds 20
-	sleep 0.5
-	flash_leds 20
+if systemctl is-active --quiet wifi-hotspot; then
+	systemctl stop wifi-hotspot
+	systemctl disable wifi-hotspot
 else
-	log "Enabling Access point..."
-	sh /usr/local/pisound/scripts/pisound-btn/enable_wifi_hotspot.sh
-	if which touchosc2midi; then
-		nohup touchosc2midi --ip=172.24.1.1 > /dev/null 2>&1 &
-	fi
-
-	flash_leds 20
+	systemctl enable wifi-hotspot
+	systemctl start wifi-hotspot
 fi
