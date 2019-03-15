@@ -3,6 +3,8 @@ Description=Pisound button daemon autostart
 After=sound.target
 
 [Service]
+EnvironmentFile=/etc/environment
+Environment=HOME=/root
 ExecStart=/usr/bin/pisound-btn
 
 [Install]
