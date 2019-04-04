@@ -34,7 +34,7 @@
 #define HOMEPAGE_URL "https://blokas.io/pisound"
 #define UPDATE_URL   HOMEPAGE_URL "/updates?btnv=%x.%02x&v=%s&sn=%s&id=%s"
 
-enum { PISOUND_BTN_VERSION     = 0x0107 };
+enum { PISOUND_BTN_VERSION     = 0x0108 };
 enum { INVALID_VERSION         = 0xffff };
 enum { BUTTON_PIN              = 17     };
 enum { CLICK_TIMEOUT_MS        = 400    };
@@ -739,9 +739,10 @@ static bool read_config_uint(const char *conf, const char *value_name, unsigned 
 	}
 }
 
-int main(int argc, char **argv)
+int main(int argc, char **argv, char **envp)
 {
 	int i;
+	bool conf_path_specified = false;
 	bool click_count_limit_specified = false;
 	for (i=1; i<argc; ++i)
 	{
@@ -761,6 +762,7 @@ int main(int argc, char **argv)
 			{
 				strncpy(g_config_path, argv[i+1], MAX_PATH_LENGTH);
 				g_config_path[MAX_PATH_LENGTH] = '\0';
+				conf_path_specified = true;
 				++i;
 			}
 			else
@@ -800,6 +802,19 @@ int main(int argc, char **argv)
 			printf("Unknown option '%s'.\n", argv[i]);
 			print_usage();
 			return 1;
+		}
+	}
+
+	if (!conf_path_specified)
+	{
+		for (i=0; envp[i] != NULL; ++i)
+		{
+			if (strncmp("PISOUND_BTN_CFG=", envp[i], 16) == 0)
+			{
+				const char *cfg = &envp[i][16];
+				strncpy(g_config_path, cfg, sizeof(g_config_path)-1);
+				g_config_path[sizeof(g_config_path)-1] = '\0';
+			}
 		}
 	}
 
