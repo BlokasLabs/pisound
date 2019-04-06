@@ -264,7 +264,30 @@ static int get_action_script_path(enum action_e action, unsigned arg0, unsigned 
 
 	char script[MAX_PATH_LENGTH + 1];
 
-	read_config_value(g_config_path, action_name, dst, n, default_script);
+	read_config_value(g_config_path, action_name, script, MAX_PATH_LENGTH, default_script);
+
+	fprintf(stderr, "script = '%s'\n", script);
+
+	// The path is absolute.
+	if (script[0] == '/')
+	{
+		strncpy(dst, script, n-2);
+		dst[n-1] = '\0';
+	}
+	else // The path is relative to the config file location.
+	{
+		char tmp[MAX_PATH_LENGTH + 1];
+
+		size_t pathLength = strlen(g_config_path);
+		strncpy(tmp, g_config_path, sizeof(tmp)-1);
+		dirname(tmp);
+		strncat(tmp, "/", sizeof(tmp)-1 - strlen(tmp));
+		strncat(tmp, script, sizeof(tmp)-1 - strlen(tmp));
+		tmp[sizeof(tmp)-1] = '\0';
+
+		strncpy(dst, tmp, n-1);
+		dst[n-1] = '\0';
+	}
 
 	return strlen(dst);
 }
