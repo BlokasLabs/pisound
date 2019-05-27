@@ -1,3 +1,9 @@
+pisound-btn (1.08-1) jessie; urgency=medium
+
+  * Allow setting path to button config via PISOUND_BTN_CFG environment variable.
+
+ -- Giedrius Trainavičius <giedrius@blokas.io>  Tue, 4 Apr 2019 15:21:32 +0200
+
 pisound-btn (1.06-1) jessie; urgency=medium
 
   * Made the click count configurable via command line (-n, --click-count-limit args)

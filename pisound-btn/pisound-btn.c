@@ -34,7 +34,7 @@
 #define HOMEPAGE_URL "https://blokas.io/pisound"
 #define UPDATE_URL   HOMEPAGE_URL "/updates?btnv=%x.%02x&v=%s&sn=%s&id=%s"
 
-enum { PISOUND_BTN_VERSION     = 0x0107 };
+enum { PISOUND_BTN_VERSION     = 0x0109 };
 enum { INVALID_VERSION         = 0xffff };
 enum { BUTTON_PIN              = 17     };
 enum { CLICK_TIMEOUT_MS        = 400    };
@@ -122,11 +122,12 @@ static bool read_line(FILE *f, char *buffer, size_t n)
 	return true;
 }
 
-static void read_config_value(const char *conf, const char *value_name, char *dst, size_t n, const char *default_value)
+static void read_config_value(const char *conf, const char *value_name, char *dst, char *args, size_t n, const char *default_value)
 {
 	const size_t BUFFER_SIZE = 2 * MAX_PATH_LENGTH + 1;
 	char line[BUFFER_SIZE];
 	char name[BUFFER_SIZE];
+	char argument[BUFFER_SIZE];
 	char value[BUFFER_SIZE];
 
 	size_t currentLine = 0;
@@ -141,23 +142,66 @@ static void read_config_value(const char *conf, const char *value_name, char *ds
 		{
 			++currentLine;
 
-			if (strlen(line) > 1)
-			{
-				int count = sscanf(line, "%s %s", name, value);
-				if (count == 2)
-				{
-					// Skip comments.
-					if (name[0] == '#')
-						continue;
+			argument[0] = '\0';
 
+			char *commentMarker = strchr(line, '#');
+			if (commentMarker)
+				*commentMarker = '\0'; // Ignore comments.
+
+			char *endline = strchr(line, '\n');
+			if (endline)
+				*endline = '\0'; // Ignore endline.
+
+			static const char *WHITESPACE_CHARS = " \t";
+
+			char *p = line + strspn(line, WHITESPACE_CHARS);
+
+			if (strlen(p) > 1)
+			{
+				char *t = strpbrk(p, WHITESPACE_CHARS);
+
+				if (t)
+				{
+					strncpy(name, p, t - p);
+					name[t - p] = '\0';
+				}
+
+				t = t + strspn(t, WHITESPACE_CHARS);
+
+				if (args)
+				{
+					char *a1 = strpbrk(t, WHITESPACE_CHARS);
+					if (a1)
+					{
+						char *a2 = a1 + strspn(a1, WHITESPACE_CHARS);
+						if (a2)
+						{
+							strcpy(argument, a2);
+						}
+						*a1 = '\0';
+					}
+				}
+
+				strcpy(value, t);
+
+				if (strlen(name) != 0 && strlen(value) != 0)
+				{
 					if (strcmp(name, value_name) == 0)
 					{
-						size_t len = strlen(value);
-						if (len < n)
+						size_t lenValue = strlen(value);
+						size_t lenArgs = strlen(argument);
+						if (lenValue < n && lenArgs < n)
 						{
-							strncpy(dst, value, len);
-							dst[len] = '\0';
 							found = true;
+
+							strncpy(dst, value, lenValue);
+							dst[lenValue] = '\0';
+
+							if (args)
+							{
+								strncpy(args, argument, lenArgs);
+								args[lenArgs] = '\0';
+							}
 							break;
 						}
 						else
@@ -168,10 +212,7 @@ static void read_config_value(const char *conf, const char *value_name, char *ds
 				}
 				else
 				{
-					if (count != 1 || name[0] != '#')
-					{
-						fprintf(stderr, "Unexpected syntax in %s on line %u!\n", conf, currentLine);
-					}
+					fprintf(stderr, "Unexpected syntax in %s on line %u!\n", conf, currentLine);
 				}
 			}
 		}
@@ -183,6 +224,7 @@ static void read_config_value(const char *conf, const char *value_name, char *ds
 	if (!found)
 	{
 		strcpy(dst, default_value);
+		*args = '\0';
 	}
 }
 
@@ -249,7 +291,7 @@ static void get_default_action_and_script(enum action_e action, unsigned arg0, u
 }
 
 // Returns the length of the path or an error (negative number).
-static int get_action_script_path(enum action_e action, unsigned arg0, unsigned arg1, char *dst, size_t n)
+static int get_action_script_path(enum action_e action, unsigned arg0, unsigned arg1, char *dst, char *args, size_t n)
 {
 	if (action < 0 || action >= A_COUNT)
 		return -EINVAL;
@@ -263,8 +305,35 @@ static int get_action_script_path(enum action_e action, unsigned arg0, unsigned 
 		return -EINVAL;
 
 	char script[MAX_PATH_LENGTH + 1];
+	char arguments[MAX_PATH_LENGTH + 1];
 
-	read_config_value(g_config_path, action_name, dst, n, default_script);
+	read_config_value(g_config_path, action_name, script, arguments, MAX_PATH_LENGTH, default_script);
+
+	fprintf(stderr, "script = '%s', args = '%s'\n", script, arguments);
+
+	// The path is absolute.
+	if (script[0] == '/')
+	{
+		strncpy(dst, script, n-2);
+		dst[n-1] = '\0';
+	}
+	else // The path is relative to the config file location.
+	{
+		char tmp[MAX_PATH_LENGTH + 1];
+
+		size_t pathLength = strlen(g_config_path);
+		strncpy(tmp, g_config_path, sizeof(tmp)-1);
+		dirname(tmp);
+		strncat(tmp, "/", sizeof(tmp)-1 - strlen(tmp));
+		strncat(tmp, script, sizeof(tmp)-1 - strlen(tmp));
+		tmp[sizeof(tmp)-1] = '\0';
+
+		strncpy(dst, tmp, n-1);
+		dst[n-1] = '\0';
+	}
+
+	strncpy(args, arguments, n-1);
+	args[n-1] = '\0';
 
 	return strlen(dst);
 }
@@ -272,7 +341,8 @@ static int get_action_script_path(enum action_e action, unsigned arg0, unsigned 
 static void execute_action(enum action_e action, unsigned arg0, unsigned arg1)
 {
 	char cmd[MAX_PATH_LENGTH + 64];
-	int n = get_action_script_path(action, arg0, arg1, cmd, sizeof(cmd));
+	char arg[MAX_PATH_LENGTH + 64];
+	int n = get_action_script_path(action, arg0, arg1, cmd, arg, sizeof(cmd));
 	if (n < 0)
 	{
 		fprintf(stderr, "execute_action: getting script path for action %u resulted in error %d!\n", action, n);
@@ -286,10 +356,12 @@ static void execute_action(enum action_e action, unsigned arg0, unsigned arg1)
 	switch (action)
 	{
 	case A_CLICK:
-		result = snprintf(p, remainingSpace, " %u", arg0);
+		if (strlen(arg) == 0) result = snprintf(p, remainingSpace, " %u", arg0);
+		else result = snprintf(p, remainingSpace, " %s", arg);
 		break;
 	case A_HOLD:
-		result = snprintf(p, remainingSpace, " %u %u", arg0, arg1);
+		if (strlen(arg) == 0) result = snprintf(p, remainingSpace, " %u %u", arg0, arg1);
+		else result = snprintf(p, remainingSpace, " %s", arg);
 		break;
 	default:
 		break;
@@ -721,7 +793,7 @@ static bool parse_uint(unsigned int *dst, const char *src)
 static bool read_config_uint(const char *conf, const char *value_name, unsigned int *dst, unsigned int default_value)
 {
 	char buffer[12];
-	read_config_value(conf, CLICK_COUNT_LIMIT_VALUE_NAME, buffer, sizeof(buffer), "#");
+	read_config_value(conf, CLICK_COUNT_LIMIT_VALUE_NAME, buffer, NULL, sizeof(buffer), "#");
 	if (buffer[0] == '#') // No value was specified.
 	{
 		*dst = default_value;
@@ -739,9 +811,10 @@ static bool read_config_uint(const char *conf, const char *value_name, unsigned 
 	}
 }
 
-int main(int argc, char **argv)
+int main(int argc, char **argv, char **envp)
 {
 	int i;
+	bool conf_path_specified = false;
 	bool click_count_limit_specified = false;
 	for (i=1; i<argc; ++i)
 	{
@@ -761,6 +834,7 @@ int main(int argc, char **argv)
 			{
 				strncpy(g_config_path, argv[i+1], MAX_PATH_LENGTH);
 				g_config_path[MAX_PATH_LENGTH] = '\0';
+				conf_path_specified = true;
 				++i;
 			}
 			else
@@ -800,6 +874,19 @@ int main(int argc, char **argv)
 			printf("Unknown option '%s'.\n", argv[i]);
 			print_usage();
 			return 1;
+		}
+	}
+
+	if (!conf_path_specified)
+	{
+		for (i=0; envp[i] != NULL; ++i)
+		{
+			if (strncmp("PISOUND_BTN_CFG=", envp[i], 16) == 0)
+			{
+				const char *cfg = &envp[i][16];
+				strncpy(g_config_path, cfg, sizeof(g_config_path)-1);
+				g_config_path[sizeof(g_config_path)-1] = '\0';
+			}
 		}
 	}
 

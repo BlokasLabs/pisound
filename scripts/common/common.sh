@@ -26,7 +26,6 @@ PISOUND_MIDI_DEVICE=`amidi -l | grep pisound | egrep -o hw:[0-9]+,[0-9]+`
 
 if [ -z $PISOUND_MIDI_DEVICE ]; then
 	log "Pisound MIDI device not found!"
-	exit 0
 #else
 #	log "Pisound MIDI device: $PISOUND_MIDI_DEVICE"
 fi
@@ -38,9 +37,13 @@ if [ -e $PISOUND_LED_FILE ]; then
 	flash_leds() {
 		sudo sh -c "echo $1 > $PISOUND_LED_FILE"
 	}
-else
+elif [ ! -z $PISOUND_MIDI_DEVICE ]; then
 	flash_leds() {
 		amidi -S "f0 f7" -p $PISOUND_MIDI_DEVICE 2> /dev/null
+	}
+else
+	flash_leds() {
+		log "Blink."
 	}
 fi
 
