@@ -4,4 +4,15 @@ if [ -e /etc/pisound.conf ]; then
 	cp /etc/pisound.conf /etc/pisound.conf.bak.`date +"%F.%T"`
 fi
 
+# try to gracefully handle hostapd.conf missingness; hostapd will not make /etc/default/hostapd.conf
+if [ ! -f /etc/hostapd/hostapd.conf ] ; then
+	# try to prefer older hostapd conf replacement, for SSID sanity
+	if [ -f /usr/local/pisound/scripts/pisound-btn/hostapd.conf ] ; then
+		cp /usr/local/pisound/scripts/pisound-btn/hostapd.conf /etc/hostapd/hostapd.conf
+	# else default to the packaged pisound hostapd.conf
+	elif [ -f /etc/pisound/hostapd.conf ] ; then
+		cp /etc/pisound/hostapd.conf /etc/hostapd/hostapd.conf
+	fi
+fi
+
 dpkg-divert --package pisound-btn --add --rename --divert /etc/default/hostapd.orig /etc/default/hostapd
