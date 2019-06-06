@@ -1,3 +1,4 @@
+systemctl daemon-reload
 if [ ! -d "/usr/local/pisound" ]; then
 	echo "Cloning pisound repository from https://github.com/BlokasLabs/pisound..."
 	git clone https://github.com/BlokasLabs/pisound.git /usr/local/pisound
@@ -25,3 +26,20 @@ if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ]; then
 fi
 # End automatically added section
 
+# Check if we're being upgraded on MODEP image.
+if [ -e "/usr/lib/systemd/system/pisound-hotspot.service" ]; then
+	sed -i 's/Pisound/MODEP/g' /etc/hostapd/hostapd.conf
+	if $(systemctl is-enabled -q pisound-hotspot); then
+		systemctl disable pisound-hotspot
+		systemctl stop pisound-hotspot
+		systemctl enable wifi-hotspot
+		systemctl start wifi-hotspot
+	fi
+	rm -f /usr/lib/systemd/system/pisound-hotspot.service
+	systemctl daemon-reload
+else
+	systemctl daemon-reload
+	if $(systemctl is-enabled -q wifi-hotspot); then
+		systemctl restart wifi-hotspot
+	fi
+fi
