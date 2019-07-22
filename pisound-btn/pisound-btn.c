@@ -30,18 +30,22 @@
 #include <poll.h>
 #include <time.h>
 #include <assert.h>
+#include <signal.h>
+#include <libgen.h>
 
 #define HOMEPAGE_URL "https://blokas.io/pisound"
 #define UPDATE_URL   HOMEPAGE_URL "/updates?btnv=%x.%02x&v=%s&sn=%s&id=%s"
 
-enum { PISOUND_BTN_VERSION     = 0x0109 };
+enum { PISOUND_BTN_VERSION     = 0x0110 };
 enum { INVALID_VERSION         = 0xffff };
-enum { BUTTON_PIN              = 17     };
 enum { CLICK_TIMEOUT_MS        = 400    };
 enum { HOLD_PRESS_TIMEOUT_MS   = CLICK_TIMEOUT_MS };
 
 #define BASE_PISOUND_DIR "usr/local/pisound"
 #define BASE_SCRIPTS_DIR BASE_PISOUND_DIR "/scripts/pisound-btn"
+
+static int g_button_pin = 17;
+static bool g_button_exported = false;
 
 enum action_e
 {
@@ -389,6 +393,99 @@ enum edge_e
 	E_BOTH    = 3,
 };
 
+// Returns negative value on error, 0 if the pin is already exported, 1 if pin was just exported successfully.
+static int gpio_export(int pin)
+{
+	if (!gpio_is_pin_valid(pin))
+	{
+		fprintf(stderr, "Invalid pin number %d!\n", pin);
+		return -1;
+	}
+
+	char gpio[64];
+
+	snprintf(gpio, sizeof(gpio), "/sys/class/gpio/gpio%d", pin);
+
+	struct stat s;
+	if (stat(gpio, &s) != 0)
+	{
+		int fd = open("/sys/class/gpio/export", O_WRONLY);
+		if (fd == -1)
+		{
+			fprintf(stderr, "Failed top open /sys/class/gpio/export!\n");
+			return -1;
+		}
+		char str_pin[4];
+		snprintf(str_pin, 3, "%d", pin);
+		str_pin[3] = '\0';
+		const int n = strlen(str_pin)+1;
+		int result = write(fd, str_pin, n);
+		if (result != n)
+		{
+			fprintf(stderr, "Failed writing to /sys/class/gpio/export! Error %d.\n",  errno);
+			close(fd);
+			return -1;
+		}
+		result = close(fd);
+		if (result != 0)
+		{
+			fprintf(stderr, "Failed closing /sys/class/gpio/export! Error %d.\n", errno);
+			return -1;
+		}
+		// Give some time for the pin to appear.
+		usleep(100000);
+		return 1;
+	}
+
+	// Already exported.
+	return 0;
+}
+
+static int gpio_unexport(int pin)
+{
+	if (!gpio_is_pin_valid(pin))
+	{
+		fprintf(stderr, "Invalid pin number %d!\n", pin);
+		return -1;
+	}
+
+	char gpio[64];
+
+	snprintf(gpio, sizeof(gpio), "/sys/class/gpio/gpio%d", pin);
+
+	struct stat s;
+	if (stat(gpio, &s) == 0)
+	{
+		int fd = open("/sys/class/gpio/unexport", O_WRONLY);
+		if (fd == -1)
+		{
+			fprintf(stderr, "Failed top open /sys/class/gpio/unexport!\n");
+			return -1;
+		}
+		char str_pin[4];
+		snprintf(str_pin, 3, "%d", pin);
+		str_pin[3] = '\0';
+		const int n = strlen(str_pin)+1;
+		int result = write(fd, str_pin, n);
+		if (result != n)
+		{
+			fprintf(stderr, "Failed writing to /sys/class/gpio/unexport! Error %d.\n",  errno);
+			close(fd);
+			return -1;
+		}
+		result = close(fd);
+		if (result != 0)
+		{
+			fprintf(stderr, "Failed closing /sys/class/gpio/unexport! Error %d.\n", errno);
+			return -1;
+		}
+		return 0;
+	}
+
+	// Already unexported.
+	return 0;
+}
+
 static int gpio_set_edge(int pin, enum edge_e edge)
 {
 	if (!gpio_is_pin_valid(pin))
@@ -602,32 +699,36 @@ static int run(void)
 
 	if (!get_pisound_serial(serial, sizeof(serial)))
 	{
-		fprintf(stderr, "Reading Pisound serial failed, did the kernel module load successfully?\n");
-		return -EINVAL;
+		strcpy(serial, "NO_PISOUND");
+		fprintf(stderr, "Reading Pisound serial failed, Pisound is possibly not attached. Continuing anyway.\n");
 	}
 	if (!get_pisound_id(id, sizeof(id)))
 	{
-		fprintf(stderr, "Reading Pisound id failed, did the kernel module load successfully?\n");
-		return -EINVAL;
+		strcpy(id, "NO_PISOUND");
+		fprintf(stderr, "Reading Pisound id failed, Pisound is possibly not attached. Continuing anyway.\n");
 	}
 
 	unsigned short version = INVALID_VERSION;
 	if (!get_pisound_version(version_string, sizeof(version_string)) || !parse_version(&version, version_string))
 	{
-		fprintf(stderr, "Reading Pisound version failed, did the kernel module load successfully?\n");
-		return -EINVAL;
+		fprintf(stderr, "Reading Pisound version failed, Pisound is possibly not attached. Continuing anyway.\n");
 	}
 
 	if (is_update_check_enabled())
 		check_for_updates(PISOUND_BTN_VERSION, version_string, serial, id);
 
-	if (version < 0x0100 || version >= 0x0200)
+	if ((version < 0x0100 || version >= 0x0200) && version != INVALID_VERSION)
 	{
 		fprintf(stderr, "The kernel module version (%04x) and pisound-btn version (%04x) are incompatible! Please check for updates at " HOMEPAGE_URL "\n", version, PISOUND_BTN_VERSION);
 		return -EINVAL;
 	}
 
-	int err = gpio_set_edge(BUTTON_PIN, E_BOTH);
+	int err = gpio_export(g_button_pin);
+
+	if (err < 0) return err;
+	else g_button_exported = (err == 1);
+
+	err = gpio_set_edge(g_button_pin, E_BOTH);
 
 	if (err != 0)
 		return err;
@@ -639,7 +740,7 @@ static int run(void)
 		FD_COUNT
 	};
 
-	int btnfd = gpio_open(BUTTON_PIN);
+	int btnfd = gpio_open(g_button_pin);
 	if (btnfd == -1)
 		return errno;
 
@@ -650,6 +751,8 @@ static int run(void)
 		gpio_close(btnfd);
 		return errno;
 	}
+
+	printf("Listening to events on GPIO #%d\n", g_button_pin);
 
 	struct pollfd pfd[FD_COUNT];
 
@@ -754,7 +857,7 @@ static int run(void)
 	close(timerfd);
 	gpio_close(btnfd);
 
-	gpio_set_edge(BUTTON_PIN, E_NONE);
+	gpio_set_edge(g_button_pin, E_NONE);
 	return 0;
 }
 
@@ -769,6 +872,7 @@ static void print_usage(void)
 		"Options:\n"
 		"\t--help               Display the usage information.\n"
 		"\t--version            Show the version information.\n"
+		"\t--gpio               The pin GPIO number to use for the button. Default is 17.\n"
 		"\t--conf               Specify the path to configuration file to use. Default is /etc/pisound.conf.\n"
 		"\t--press-count-limit  Set the press count limit. Use 0 for no limit. Default is 8.\n"
 		"\t-n                   Short for --click-count-limit.\n"
@@ -811,8 +915,28 @@ static bool read_config_uint(const char *conf, const char *value_name, unsigned 
 	}
 }
 
+static void cleanup(void)
+{
+	if (g_button_exported)
+	{
+		gpio_unexport(g_button_pin);
+		g_button_exported = false;
+	}
+}
+
+static void sigint_handler(int signum)
+{
+	exit(0);
+}
+
 int main(int argc, char **argv, char **envp)
 {
+	atexit(&cleanup);
+	struct sigaction action;
+	memset(&action, 0, sizeof(action));
+	action.sa_handler = &sigint_handler;
+	sigaction(SIGINT, &action, NULL);
+
 	int i;
 	bool conf_path_specified = false;
 	bool click_count_limit_specified = false;
@@ -865,6 +989,30 @@ int main(int argc, char **argv, char **envp)
 			else
 			{
 				printf("Missing count argument for '%s'!\n", argv[i]);
+				print_usage();
+				return 1;
+			}
+		}
+		else if (strcmp(argv[i], "--gpio") == 0)
+		{
+			if (i + 1 < argc)
+			{
+				unsigned int x;
+				if (parse_uint(&x, argv[i+1]))
+				{
+					g_button_pin = (int)x;
+					++i;
+				}
+				else
+				{
+					printf("Failed parsing GPIO argument for '%s'!\n", argv[i]);
+					print_usage();
+					return 1;
+				}
+			}
+			else
+			{
+				printf("Missing GPIO argument for '%s'!\n", argv[i]);
 				print_usage();
 				return 1;
 			}
