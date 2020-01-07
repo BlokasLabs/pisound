@@ -1,6 +1,6 @@
 /*
  * Pisound Linux kernel module.
- * Copyright (C) 2016-2017  Vilniaus Blokas UAB, https://blokas.io/pisound
+ * Copyright (C) 2016-2020  Vilniaus Blokas UAB, https://blokas.io/pisound
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -286,9 +286,6 @@ static irqreturn_t data_available_interrupt_handler(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-static DEFINE_SPINLOCK(spilock);
-static unsigned long spilockflags;
-
 static uint16_t spi_transfer16(uint16_t val)
 {
 	uint8_t txbuf[2];
@@ -329,13 +326,11 @@ static void spi_transfer(const uint8_t *txbuf, uint8_t *rxbuf, int len)
 	transfer.tx_buf = txbuf;
 	transfer.rx_buf = rxbuf;
 	transfer.len = len;
-	transfer.speed_hz = 100000;
+	transfer.speed_hz = 150000;
 	transfer.delay_usecs = 10;
 	spi_message_add_tail(&transfer, &msg);
 
-	spin_lock_irqsave(&spilock, spilockflags);
 	err = spi_sync(pisnd_spi_device, &msg);
-	spin_unlock_irqrestore(&spilock, spilockflags);
 
 	if (err < 0) {
 		printe("spi_sync error %d\n", err);
@@ -408,9 +403,9 @@ static struct spi_device *pisnd_spi_find_device(void)
 static void pisnd_work_handler(struct work_struct *work)
 {
 	enum { TRANSFER_SIZE = 4 };
-	enum { PISOUND_OUTPUT_BUFFER_SIZE = 128 };
-	enum { MIDI_BYTES_PER_SECOND = 3125 };
-	int out_buffer_used = 0;
+	enum { PISOUND_OUTPUT_BUFFER_SIZE_MILLIBYTES = 127 * 1000 };
+	enum { MIDI_MILLIBYTES_PER_JIFFIE = (3125 * 1000) / HZ };
+	int out_buffer_used_millibytes = 0;
 	unsigned long now;
 	uint8_t val;
 	uint8_t txbuf[TRANSFER_SIZE];
@@ -450,7 +445,9 @@ static void pisnd_work_handler(struct work_struct *work)
 			had_data = false;
 			memset(txbuf, 0, sizeof(txbuf));
 			for (i = 0; i < sizeof(txbuf) &&
-				out_buffer_used < PISOUND_OUTPUT_BUFFER_SIZE;
+				((out_buffer_used_millibytes+1000 <
+				PISOUND_OUTPUT_BUFFER_SIZE_MILLIBYTES) ||
+				g_ledFlashDurationChanged);
 				i += 2) {
 
 				val = 0;
@@ -463,7 +460,7 @@ static void pisnd_work_handler(struct work_struct *work)
 				} else if (kfifo_get(&spi_fifo_out, &val)) {
 					txbuf[i+0] = 0x0f;
 					txbuf[i+1] = val;
-					++out_buffer_used;
+					out_buffer_used_millibytes += 1000;
 				}
 			}
 
@@ -474,12 +471,14 @@ static void pisnd_work_handler(struct work_struct *work)
 			 * rate.
 			 */
 			now = jiffies;
-			out_buffer_used -=
-				(MIDI_BYTES_PER_SECOND / HZ) /
-				(now - last_transfer_at);
-			if (out_buffer_used < 0)
-				out_buffer_used = 0;
-			last_transfer_at = now;
+			if (now != last_transfer_at) {
+				out_buffer_used_millibytes -=
+					(now - last_transfer_at) *
+					MIDI_MILLIBYTES_PER_JIFFIE;
+				if (out_buffer_used_millibytes < 0)
+					out_buffer_used_millibytes = 0;
+				last_transfer_at = now;
+			}
 
 			for (i = 0; i < sizeof(rxbuf); i += 2) {
 				if (rxbuf[i]) {
@@ -494,6 +493,7 @@ static void pisnd_work_handler(struct work_struct *work)
 			|| !kfifo_is_empty(&spi_fifo_out)
 			|| pisnd_spi_has_more()
 			|| g_ledFlashDurationChanged
+			|| out_buffer_used_millibytes != 0
 			);
 
 		if (!kfifo_is_empty(&spi_fifo_in) && g_recvCallback)
@@ -532,10 +532,10 @@ static void pisnd_spi_gpio_uninit(void)
 
 static int pisnd_spi_gpio_irq_init(struct device *dev)
 {
-	return request_irq(
-		gpiod_to_irq(data_available),
+	return request_threaded_irq(
+		gpiod_to_irq(data_available), NULL,
 		data_available_interrupt_handler,
-		IRQF_TIMER | IRQF_TRIGGER_RISING,
+		IRQF_TIMER | IRQF_TRIGGER_RISING | IRQF_ONESHOT,
 		"data_available_int",
 		NULL
 		);
