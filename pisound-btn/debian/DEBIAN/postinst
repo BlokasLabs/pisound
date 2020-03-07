@@ -50,5 +50,5 @@ if [ -e /etc/pisound.conf ]; then
 	else
 		unlink /etc/pisound.conf
 	fi
-	ln -s /usr/local/etc/pisound.conf /etc/pisound.conf
 fi
+ln -s /usr/local/etc/pisound.conf /etc/pisound.conf

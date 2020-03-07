@@ -228,7 +228,8 @@ static void read_config_value(const char *conf, const char *value_name, char *ds
 	if (!found)
 	{
 		strcpy(dst, default_value);
-		*args = '\0';
+		if (args)
+			*args = '\0';
 	}
 }
 
