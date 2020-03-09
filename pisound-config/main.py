@@ -26,8 +26,7 @@ def add_back_button(parent, title='Back'):
 def main_menu(*button):
     title = 'Pisound Configuration Tool'
     settings = [{'title': 'Change Pisound Button Settings', 'callback': btn_menu},
-        {'title': 'Change Pisound Hotspot Settings', 'callback': hs_menu},
-        {'title': 'Change Default System Soundcard', 'callback': cards_menu}]
+        {'title': 'Change Pisound Hotspot Settings', 'callback': hs_menu}]
     setup = [{'title': 'Install Additional Software', 'callback': install_menu},
         {'title': 'Update Pisound', 'parent': restart, 'callback': run_sh, 'file': 'system-update.sh'}]
     info = [{'title': 'Show More Info', 'callback': info_message}]
@@ -73,21 +72,6 @@ def btn_update_silent(button, selection):
         val = selection['new_value']
     values.update_btn_config(selection['key'], val)
     btn_menu(selection)
-
-def cards_menu(button, *selection):
-    title = 'Change Default Card'
-    active_card = values.get_active_card()
-    description = 'Currently active card is {}'.format(active_card['title'])
-    items = values.get_cards()
-    for item in items:
-        item['current'] = active_card['key']
-    parent = main_menu
-    callback = set_card_silent
-    view = views.list_view(loop, title, description, items, callback, parent=parent)
-
-def set_card_silent(button, selection):
-    values.set_active_card(selection)
-    cards_menu(selection)
 
 def hs_menu(button, *selection):
     title = 'Pisound Hotspot Settings'
