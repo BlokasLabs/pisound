@@ -1,2 +1,2 @@
 #!/bin/sh
-python /usr/local/pisound/pisound-config/main.py
+exec /usr/local/pisound/pisound-config/main.py

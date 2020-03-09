@@ -4,7 +4,7 @@ Section: sound
 Priority: optional
 Architecture: armhf
 Pre-Depends: hostapd (>= 2:2.6), dnsmasq (>= 2.72)
-Depends: libc6 (>= 2.19), libgcc1 (>= 1:4.9.2-10), python (>= 2.7), python-urwid (>= 1.1), git (>= 1:2.1.4), libglib2.0-bin (>= 2.33.12)
+Depends: libc6 (>= 2.19), libgcc1 (>= 1:4.9.2-10), python3 (>= 3.7), python3-urwid (>= 2.0), git (>= 1:2.1.4), libglib2.0-bin (>= 2.33.12)
 Maintainer: Blokas Labs <hello@blokas.io>
 Description: Pisound Button daemon.
  See https://blokas.io/pisound for more information.
