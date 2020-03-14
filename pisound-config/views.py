@@ -65,13 +65,13 @@ def list_view(loop, title, description, items, callback=False, parent=False):
     content = urwid.ListBox(list_content)
     loop.widget = prepare(content, title)
 
-def message(loop, selection, message, parent=False):
+def message(loop, title, message, parent=False):
     message = urwid.Text(message)
     body = [message, urwid.Divider()]
     if parent:
         body += add_back_button(parent)
     content = urwid.Filler(urwid.Pile(body))
-    loop.widget = prepare(content)
+    loop.widget = prepare(content, title)
 
 def input(loop, selection, title, description, callback=False, parent=False):
     body = [urwid.Text(description), urwid.Divider()]
