@@ -29,6 +29,9 @@ def main_menu(*button):
         {'title': 'Change Pisound Hotspot Settings', 'callback': hs_menu}]
     setup = [{'title': 'Install Additional Software', 'callback': install_menu},
         {'title': 'Update Pisound', 'parent': restart, 'callback': run_sh, 'file': 'system-update.sh'}]
+
+    setup.append({'title': 'Raspberry Pi 4 Compatibility', 'callback': rpi4_compatibility_menu})
+
     info = [{'title': 'Show More Info', 'callback': info_message}]
     view = views.main_view(loop, title, settings, setup, info, exit)
 
@@ -95,6 +98,43 @@ def hs_update_silent(button, selection):
         values.update_hs_config(selection['key'], selection['new_value'])
         hs_restart_message(selection)
 
+def toggle_rpi4_workaround(button, selection):
+    values.set_rpi4_workaround_enabled(not values.is_rpi4_workaround_enabled())
+    views.message(loop, 'Done!', 'Reboot the system for the change to take effect.', main_menu)
+
+def rpi4_compatibility_menu(button, selection):
+    title = 'Raspberry Pi 4 Compatibility'
+
+    description_long = """Raspberry Pi 4 has broken the behavior of the 3.3V line on the 40-pin GPIO header. This causes an issue on reboot which is described here:
+
+https://community.blokas.io/t/pisound-with-raspberry-pi-4/1238/12
+
+You may use the options below to enable or disable a software workaround to avoid the issue. In particular, it disables the '1.8V' communication mode of the SD card. It has a downside that it limits the SD card speeds to the ones available on Raspberry Pi 3, which are still quite fast. You'd be impacted only if you use one of the high end SD cards, but then you could opt to instead have the workaround off and keep the reboot issue in mind.
+
+The software workaround gets applied to /boot/cmdline.txt - it has to be re-applied every time you format the SD card.
+
+Since hardware version 1.1, Pisound has a built-in hardware workaround to fix the compatibility with RPi 4.
+
+----
+
+Bootloader EEPROM Update Recommended: {}
+
+Software Workaround Enabled: {}"""
+
+    if not values.is_rpi4_compatible():
+        description = description_long.format(values.get_rpi4_bootloader_update_recommendation(), 'Yes' if values.is_rpi4_workaround_enabled() else 'No')
+    else:
+        description = 'Your Pisound is fully compatible with RPi 4.'
+        if values.is_rpi4_workaround_enabled():
+            description += "\n\nThe software workaround is enabled (https://community.blokas.io/t/pisound-with-raspberry-pi-4/1238/12), it's recommended to disable it."
+        else:
+            description += "\n\nThe software workaround is disabled (https://community.blokas.io/t/pisound-with-raspberry-pi-4/1238/12), it's recommended to keep it disabled."
+
+    callback=toggle_rpi4_workaround
+
+    items = [{'title': 'Enable Workaround' if not values.is_rpi4_workaround_enabled() else 'Disable Workaround'}]
+    view = views.list_view(loop, title, description, items, callback, main_menu)
+
 def hs_restart_message(selection):
     message = 'The changes will take an effect next time you start the hotspot.'
     parent = hs_menu
@@ -105,14 +145,15 @@ def info_message(button, selection):
     serial = values.get_serial()
     btn_version = values.get_btn_version()
     ctl_version = values.get_ctl_version()
+    hw_version = values.get_hw_version()
     ip = values.get_ip()
     hostname = values.get_hostname()
     message = 'Button Version: {}'\
-        '\nServer Version: {}\nFirmware Version: {}'\
+        '\nServer Version: {}\nFirmware Version: {}\nHardware Version: {}'\
         '\nSerial Number: {}\nIP Address: {}'\
-        '\nHostname: {}\n'.format(btn_version, ctl_version, version, serial, ip, hostname)
+        '\nHostname: {}\n'.format(btn_version, ctl_version, version, hw_version, serial, ip, hostname)
     parent = main_menu
-    view = views.message(loop, selection, message, parent)
+    view = views.message(loop, 'Info', message, parent)
 
 def install_menu(button, *selection):
     title = 'Install Additional Software'

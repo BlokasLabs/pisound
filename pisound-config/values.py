@@ -137,6 +137,53 @@ def get_ctl_version():
     out = subprocess.check_output(['pisound-ctl', '--version'])
     return str(out.decode("utf-8")).split(' ')[4].strip(',')
 
+def is_running_on_rpi4():
+    try:
+        ec = subprocess.call(['grep', '-q', 'Raspberry Pi 4', '/proc/cpuinfo'])
+        return ec == 0
+    except:
+        return False
+
+def get_rpi4_bootloader_update_recommendation():
+    if not is_running_on_rpi4():
+        return "Not running on RPi4 at the moment, cannot evaluate."
+    try:
+        cmd = subprocess.Popen(['vcgencmd', 'bootloader_version'], stdout=subprocess.PIPE)
+        if cmd.stdout.readlines()[2].split(' ')[1].strip() < '1568112110':
+            return 'Yes (See https://www.raspberrypi.org/documentation/hardware/raspberrypi/booteeprom.md)'
+        else:
+            return 'No'
+    except:
+        return "Unknown error occurred, cannot evaluate."
+
+def is_rpi4_workaround_enabled():
+    try:
+        ec = subprocess.call(['grep', '-q', 'sdhci.debug_quirks2=4', '/boot/cmdline.txt'])
+        return ec == 0
+    except:
+        return False
+
+def set_rpi4_workaround_enabled(enabled):
+    try:
+        if enabled:
+            if not is_rpi4_workaround_enabled():
+                subprocess.call(['sed', 's/.*/& sdhci.debug_quirks2=4/', '/boot/cmdline.txt', '-i'])
+        else:
+            if is_rpi4_workaround_enabled():
+                subprocess.call(['sed', 's/ sdhci.debug_quirks2=4//', '/boot/cmdline.txt', '-i'])
+    except:
+        return
+
+def get_hw_version():
+    try:
+        with open('/sys/kernel/pisound/hw_version', mode='rt') as f:
+            return f.read().strip('\n\0')
+    except:
+        return '1.0';
+
+def is_rpi4_compatible():
+    return get_hw_version() != '1.0'
+
 def get_ip():
     out = subprocess.check_output(['hostname', '-I'])
     return str(out.decode("utf-8")).strip()
