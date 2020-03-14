@@ -27,6 +27,8 @@ sudo rfkill unblock wifi
 sudo dhcpcd --allowinterfaces wlan0
 sudo systemctl stop hostapd
 sudo systemctl stop dnsmasq
+sudo systemctl disable hostapd
+sudo systemctl disable dnsmasq
 sudo ifconfig wlan0 0.0.0.0
 sudo sh -c "echo | iptables-restore"
 sudo sh -c "echo 0 > /proc/sys/net/ipv4/ip_forward"

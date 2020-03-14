@@ -112,4 +112,4 @@ def run_sh(loop, selection, title, path, parent=False):
         line = str(line).strip()
         info = info + line + '\n'
         text.set_text(info)
-        loop.draw_screen()   
+        loop.draw_screen()

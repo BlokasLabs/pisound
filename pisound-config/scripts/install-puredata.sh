@@ -1,6 +1,6 @@
 #!/bin/sh
 
 SOFTWARE_TO_INSTALL="puredata"
-sudo apt-get update
-sudo apt-get install $SOFTWARE_TO_INSTALL -y
+apt-get update
+apt-get install $SOFTWARE_TO_INSTALL --no-install-recommends -y
 echo "Done! Thank you!"

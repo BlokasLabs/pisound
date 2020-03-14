@@ -44,7 +44,12 @@ install: all $(PISOUND_DIR) # backup-scripts
 	@mkdir -p $(PATCHES_DIR)
 	@chmod 777 $(PATCHES_DIR)
 	@cp -p pisound-btn.service /usr/lib/systemd/system/
-	@cp -p pisound.conf /etc/
+	@mkdir -p /usr/local/etc
+	@cp -p pisound.conf /usr/local/etc/
+	@if test -e /etc/pisound.conf || test -h /etc/pisound.conf; then \
+		unlink /etc/pisound.conf || rm /etc/pisound.conf; \
+	fi
+	@ln -s /usr/local/etc/pisound.conf /etc/pisound.conf
 	@systemctl daemon-reload > /dev/null 2>&1
 	@systemctl enable pisound-btn > /dev/null 2>&1
 	@systemctl start pisound-btn > /dev/null 2>&1
@@ -58,8 +63,8 @@ pisound-btn.deb: pisound-btn
 	@gzip --best -n ./debian/usr/share/doc/pisound-btn/changelog ./debian/usr/share/doc/pisound-btn/changelog.Debian ./debian/usr/share/man/man1/pisound-btn.1
 	@mkdir -p debian/usr/bin
 	@cp pisound-btn debian/usr/bin/
-	@mkdir -p debian/etc
-	@cp pisound.conf debian/etc/
+	@mkdir -p debian/usr/local/etc
+	@cp pisound.conf debian/usr/local/etc/
 	@fakeroot dpkg --build debian
 	@mv debian.deb pisound-btn.deb
 	@gunzip `find . | grep gz` > /dev/null 2>&1

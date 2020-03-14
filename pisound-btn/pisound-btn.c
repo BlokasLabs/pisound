@@ -36,7 +36,7 @@
 #define HOMEPAGE_URL "https://blokas.io/pisound"
 #define UPDATE_URL   HOMEPAGE_URL "/updates?btnv=%x.%02x&v=%s&sn=%s&id=%s"
 
-enum { PISOUND_BTN_VERSION     = 0x0110 };
+enum { PISOUND_BTN_VERSION     = 0x0111 };
 enum { INVALID_VERSION         = 0xffff };
 enum { CLICK_TIMEOUT_MS        = 400    };
 enum { HOLD_PRESS_TIMEOUT_MS   = CLICK_TIMEOUT_MS };
@@ -228,7 +228,8 @@ static void read_config_value(const char *conf, const char *value_name, char *ds
 	if (!found)
 	{
 		strcpy(dst, default_value);
-		*args = '\0';
+		if (args)
+			*args = '\0';
 	}
 }
 
