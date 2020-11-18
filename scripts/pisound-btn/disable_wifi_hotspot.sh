@@ -20,22 +20,28 @@
 
 . /usr/local/pisound/scripts/common/common.sh
 
+if [[ "$(systemctl is-system-running || true)" == "stopping" ]]; then
+	flash_leds 1
+	log "System is stopping anyway, skipping disabling WiFi hotspot."
+	exit
+fi
+
 flash_leds 1
 log "Disabling Access point..."
 
-sudo rfkill unblock wifi
-sudo dhcpcd --allowinterfaces wlan0
-sudo systemctl stop hostapd
-sudo systemctl stop dnsmasq
-sudo systemctl disable hostapd
-sudo systemctl disable dnsmasq
-sudo ifconfig wlan0 0.0.0.0
-sudo sh -c "echo | iptables-restore"
-sudo sh -c "echo 0 > /proc/sys/net/ipv4/ip_forward"
-sudo iwlist wlan0 scan > /dev/null 2>&1
-sudo ifconfig wlan0 up
-sudo systemctl restart avahi-daemon
-sudo wpa_cli -i wlan0 reconnect
+rfkill unblock wifi
+dhcpcd --allowinterfaces wlan0
+systemctl stop hostapd
+systemctl stop dnsmasq
+systemctl disable hostapd
+systemctl disable dnsmasq
+ifconfig wlan0 0.0.0.0
+echo | iptables-restore
+echo 0 > /proc/sys/net/ipv4/ip_forward
+iwlist wlan0 scan > /dev/null 2>&1
+ifconfig wlan0 up
+systemctl restart avahi-daemon
+wpa_cli -i wlan0 reconnect
 
 flash_leds 20
 sleep 0.5
