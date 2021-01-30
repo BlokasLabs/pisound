@@ -61,14 +61,10 @@ enum action_e
 static const char *const DOWN_VALUE_NAME           = "DOWN";
 static const char *const UP_VALUE_NAME             = "UP";
 
-static const char *const CLICK_1_VALUE_NAME        = "CLICK_1";
-static const char *const CLICK_2_VALUE_NAME        = "CLICK_2";
-static const char *const CLICK_3_VALUE_NAME        = "CLICK_3";
+static const char *const CLICK_NAME="CLICK_%u";
 static const char *const CLICK_OTHER_VALUE_NAME    = "CLICK_OTHER";
 
-static const char *const HOLD_1S_VALUE_NAME        = "HOLD_1S";
-static const char *const HOLD_3S_VALUE_NAME        = "HOLD_3S";
-static const char *const HOLD_5S_VALUE_NAME        = "HOLD_5S";
+static const char *const HOLD_NAME="HOLD_%uS";
 static const char *const HOLD_OTHER_VALUE_NAME     = "HOLD_OTHER";
 
 static const char *const CLICK_COUNT_LIMIT_VALUE_NAME = "CLICK_COUNT_LIMIT";
@@ -78,27 +74,30 @@ static const char *const PISOUND_SERIAL_FILE       = "/sys/kernel/pisound/serial
 static const char *const PISOUND_VERSION_FILE      = "/sys/kernel/pisound/version";
 
 static const char *const UPDATE_CHECK_DISABLE_FILE = BASE_PISOUND_DIR "/disable_update_check"; // If the file exists, the update check will be disabled.
-
 static const char *const DEFAULT_DOWN              = BASE_SCRIPTS_DIR "/system/down.sh";
 static const char *const DEFAULT_UP                = BASE_SCRIPTS_DIR "/system/up.sh";
-
 static const char *const DEFAULT_CLICK_1           = BASE_SCRIPTS_DIR "/start_puredata.sh";
 static const char *const DEFAULT_CLICK_2           = BASE_SCRIPTS_DIR "/stop_puredata.sh";
 static const char *const DEFAULT_CLICK_3           = BASE_SCRIPTS_DIR "/toggle_wifi_hotspot.sh";
 
-// Receives 'times clicked' argument.
-static const char *const DEFAULT_CLICK_OTHER       = BASE_SCRIPTS_DIR "/do_nothing.sh";
-
 // Receive 'held after n clicks' and 'time held' arguments.
-static const char *const DEFAULT_HOLD_1S           = BASE_SCRIPTS_DIR "/do_nothing.sh";
 static const char *const DEFAULT_HOLD_3S           = BASE_SCRIPTS_DIR "/toggle_bt_discoverable.sh";
 static const char *const DEFAULT_HOLD_5S           = BASE_SCRIPTS_DIR "/shutdown.sh";
-static const char *const DEFAULT_HOLD_OTHER        = BASE_SCRIPTS_DIR "/do_nothing.sh";
 
 // Arbitrarily chosen limit.
 enum { MAX_PATH_LENGTH = 4096 };
 
 static char g_config_path[MAX_PATH_LENGTH+1]  = "/etc/pisound.conf";
+
+// must hold the CLICK_OTHER_VALUE_NAME or HOLD_OTHER_VALUE_NAME values
+#define ACTION_NAME_SIZE 11
+// printf( CLICK_%u", ABSOLUTE_MAX_CLICK) must fit in ACTION_NAME_SIZE
+#define ABSOLUTE_MAX_CLICK 99
+// printf( HOLD_%uS", ABSOLUTE_MAX_HOLD) must fit in ACTION_NAME_SIZE
+#define ABSOLUTE_MAX_HOLD 99
+// convert ticks to seconds so the [0,2) == 1, [2,4) == 3, [4,6) == 5
+#define TICK_2_SECONDS(x) (x/1000 + (x%2))
+
 
 enum { DEFAULT_CLICK_COUNT_LIMIT = 8 };
 
@@ -188,7 +187,7 @@ static void read_config_value(const char *conf, const char *value_name, char *ds
 
 				strcpy(value, t);
 
-				if (strlen(name) != 0 && strlen(value) != 0)
+				if (strlen(name) != 0)
 				{
 					if (strcmp(name, value_name) == 0)
 					{
@@ -210,13 +209,13 @@ static void read_config_value(const char *conf, const char *value_name, char *ds
 						}
 						else
 						{
-							fprintf(stderr, "Too long value set in %s on line %u!\n", conf, currentLine);
+							fprintf(stderr, "Too long value set in %s on line %lu!\n", conf, currentLine);
 						}
 					}
 				}
 				else
 				{
-					fprintf(stderr, "Unexpected syntax in %s on line %u!\n", conf, currentLine);
+					fprintf(stderr, "Unexpected syntax in %s on line %lu!\n", conf, currentLine);
 				}
 			}
 		}
@@ -233,94 +232,145 @@ static void read_config_value(const char *conf, const char *value_name, char *ds
 	}
 }
 
-static void get_default_action_and_script(enum action_e action, unsigned arg0, unsigned arg1, const char **name, const char **script)
+static int get_action_name(enum action_e action, char * action_name, unsigned click_count, unsigned hold_time)
 {
+	memset( action_name, 0, ACTION_NAME_SIZE+1 );
 	switch (action)
 	{
 	case A_DOWN:
-		*name = DOWN_VALUE_NAME;
-		*script = DEFAULT_DOWN;
+		strcpy( action_name,  DOWN_VALUE_NAME );
 		break;
 	case A_UP:
-		*name = UP_VALUE_NAME;
-		*script = DEFAULT_UP;
+		strcpy( action_name,  UP_VALUE_NAME);
 		break;
 	case A_CLICK:
-		switch (arg0)
+		strcpy( action_name,  CLICK_NAME);
+		if (click_count <= ABSOLUTE_MAX_CLICK)
 		{
-		case 1:
-			*name = CLICK_1_VALUE_NAME;
-			*script = DEFAULT_CLICK_1;
-			break;
-		case 2:
-			*name = CLICK_2_VALUE_NAME;
-			*script = DEFAULT_CLICK_2;
-			break;
-		case 3:
-			*name = CLICK_3_VALUE_NAME;
-			*script = DEFAULT_CLICK_3;
-			break;
-		default:
-			*name = CLICK_OTHER_VALUE_NAME;
-			*script = DEFAULT_CLICK_OTHER;
-			break;
+			sprintf( action_name, CLICK_NAME, click_count );
+		} else {
+			strcpy( action_name, CLICK_OTHER_VALUE_NAME );
 		}
 		break;
 	case A_HOLD:
-		if (arg1 < 3000)
+		strcpy( action_name, HOLD_NAME);
+		unsigned timer = TICK_2_SECONDS(hold_time);
+		if (timer <= ABSOLUTE_MAX_HOLD)
 		{
-			*name = HOLD_1S_VALUE_NAME;
-			*script = DEFAULT_HOLD_1S;
-		}
-		else if (arg1 < 5000)
-		{
-			*name = HOLD_3S_VALUE_NAME;
-			*script = DEFAULT_HOLD_3S;
-		}
-		else if (arg1 < 7000)
-		{
-			*name = HOLD_5S_VALUE_NAME;
-			*script = DEFAULT_HOLD_5S;
-		}
-		else
-		{
-			*name = HOLD_OTHER_VALUE_NAME;
-			*script = DEFAULT_HOLD_OTHER;
+			sprintf( action_name, HOLD_NAME, timer );
+		} else {
+			strcpy( action_name, HOLD_OTHER_VALUE_NAME );
 		}
 		break;
 	default:
-		*name = NULL;
-		*script = NULL;
 		break;
+	}
+	return 0;
+}
+
+static void get_action_script(enum action_e action, char* action_name, char *buffer, char* args, unsigned int buff_length)
+{
+	if (action_name[0] == '\0')
+	{
+		buffer[0] = '\0';
+	}
+
+	read_config_value(g_config_path, action_name, buffer, args, buff_length, "#");
+	// if buffer[0] == '0' then the entry did not exist in the config file.
+	if (buffer[0] == '\0')// No value was specified.
+	{
+		bool found = false;
+		switch (action)
+		{
+		case A_UP:
+			strcpy( buffer, DEFAULT_UP );
+			if (args)
+				args[0] = '\0';
+			break;
+		case A_DOWN:
+			strcpy( buffer, DEFAULT_DOWN );
+			if (args)
+				args[0] = '\0';
+			break;
+		case A_CLICK:
+			if (strcmp("CLICK_1", action_name) == 0)
+			{
+				strcpy( buffer, DEFAULT_CLICK_1 );
+				if (args)
+					args[0] = '\0';
+			}
+			else if (strcmp("CLICK_2", action_name) == 0)
+			{
+				strcpy( buffer, DEFAULT_CLICK_2 );
+				if (args)
+					args[0] = '\0';
+			}
+			else if (strcmp("CLICK_3", action_name) == 0)
+			{
+				strcpy( buffer, DEFAULT_CLICK_3 );
+				if (args)
+					args[0] = '\0';
+			}
+			else
+			{
+				read_config_value(g_config_path, CLICK_OTHER_VALUE_NAME, buffer, args, buff_length, "#");
+			}
+			break;
+		case A_HOLD:
+			if (strcmp("HOLD_3S", action_name) == 0)
+			{
+				strcpy( buffer, DEFAULT_HOLD_3S );
+				if (args)
+					args[0] = '\0';
+			}
+			else if (strcmp("HOLD_5S", action_name) == 0)
+			{
+				strcpy( buffer, DEFAULT_HOLD_5S );
+				if (args)
+					args[0] = '\0';
+			} else {
+				read_config_value(g_config_path, HOLD_OTHER_VALUE_NAME, buffer, args, buff_length, "#");
+			}
+			break;
+		default:
+			break;
+		}
+	}
+	// if there is a # at this point entry existed in the config file but had no value
+	if (buffer[0] == '#' ) {
+		buffer[0] = '\0';
 	}
 }
 
-// Returns the length of the path or an error (negative number).
-static int get_action_script_path(enum action_e action, unsigned arg0, unsigned arg1, char *dst, char *args, size_t n)
+// 0 or an error (negative number).
+static int get_action_script_path(enum action_e action, char * action_name, unsigned click_count, unsigned hold_time, char *script, char *args, size_t n)
 {
-	if (action < 0 || action >= A_COUNT)
+	if (action < 0 || action >= A_COUNT) {
 		return -EINVAL;
+	}
 
-	const char *action_name = NULL;
-	const char *default_script = NULL;
-
-	get_default_action_and_script(action, arg0, arg1, &action_name, &default_script);
-
-	if (action_name == NULL || default_script == NULL)
+	get_action_name(action, action_name, click_count, hold_time);
+	if (action_name[0] == '\0')
+	{
 		return -EINVAL;
+	}
 
-	char script[MAX_PATH_LENGTH + 1];
+	char action_script[MAX_PATH_LENGTH + 1];
 	char arguments[MAX_PATH_LENGTH + 1];
 
-	read_config_value(g_config_path, action_name, script, arguments, MAX_PATH_LENGTH, default_script);
+	get_action_script(action, action_name, action_script, arguments, MAX_PATH_LENGTH );
 
-	fprintf(stderr, "script = '%s', args = '%s'\n", script, arguments);
+	fprintf(stderr, "script = '%s', args = '%s'\n", action_script, arguments);
 
-	// The path is absolute.
-	if (script[0] == '/')
+	if (action_script[0] == '\0')
 	{
-		strncpy(dst, script, n-2);
-		dst[n-1] = '\0';
+		return 0;
+	}
+	// The path is absolute.
+	if (action_script[0] == '/')
+	{
+		strncpy(script, action_script, n-2);
+		script[n-1] = '\0';
 	}
 	else // The path is relative to the config file location.
 	{
@@ -330,30 +380,36 @@ static int get_action_script_path(enum action_e action, unsigned arg0, unsigned 
 		strncpy(tmp, g_config_path, sizeof(tmp)-1);
 		dirname(tmp);
 		strncat(tmp, "/", sizeof(tmp)-1 - strlen(tmp));
-		strncat(tmp, script, sizeof(tmp)-1 - strlen(tmp));
+		strncat(tmp, action_script, sizeof(tmp)-1 - strlen(tmp));
 		tmp[sizeof(tmp)-1] = '\0';
 
-		strncpy(dst, tmp, n-1);
-		dst[n-1] = '\0';
+		strncpy(script, tmp, n-1);
+		script[n-1] = '\0';
 	}
 
 	strncpy(args, arguments, n-1);
 	args[n-1] = '\0';
 
-	return strlen(dst);
+	return 0;
 }
 
-static void execute_action(enum action_e action, unsigned arg0, unsigned arg1)
+static void execute_action(enum action_e action, unsigned click_count, unsigned hold_time)
 {
 	char cmd[MAX_PATH_LENGTH + 64];
 	char arg[MAX_PATH_LENGTH + 64];
-	int n = get_action_script_path(action, arg0, arg1, cmd, arg, sizeof(cmd));
+	char action_name[ ACTION_NAME_SIZE+1 ];
+	int n = get_action_script_path(action, action_name, click_count, hold_time, cmd, arg, sizeof(cmd));
 	if (n < 0)
 	{
-		fprintf(stderr, "execute_action: getting script path for action %u resulted in error %d!\n", action, n);
+		fprintf(stderr, "execute_action: getting script path for action %u click count %u hold time %u (%u seconds)resulted in error %d!\n", action, click_count, hold_time, TICK_2_SECONDS(hold_time), n);
 		return;
 	}
 
+	if (cmd[0] == '\0')
+	{
+		fprintf(stderr, "execute_action: no command for action %s : click count %u hold time %u (%u seconds)\n", action_name, click_count, hold_time, TICK_2_SECONDS(hold_time));
+		return;
+	}
 	char *p = cmd + n;
 	size_t remainingSpace = sizeof(cmd) - n + 1;
 	int result = 0;
@@ -361,11 +417,11 @@ static void execute_action(enum action_e action, unsigned arg0, unsigned arg1)
 	switch (action)
 	{
 	case A_CLICK:
-		if (strlen(arg) == 0) result = snprintf(p, remainingSpace, " %u", arg0);
+		if (strlen(arg) == 0) result = snprintf(p, remainingSpace, " %u", click_count);
 		else result = snprintf(p, remainingSpace, " %s", arg);
 		break;
 	case A_HOLD:
-		if (strlen(arg) == 0) result = snprintf(p, remainingSpace, " %u %u", arg0, arg1);
+		if (strlen(arg) == 0) result = snprintf(p, remainingSpace, " %u %u", click_count, hold_time);
 		else result = snprintf(p, remainingSpace, " %s", arg);
 		break;
 	default:
@@ -677,12 +733,12 @@ static void onTimesClicked(unsigned num_presses)
 	execute_action(A_CLICK, num_presses, 0);
 }
 
-static void onDown(void)
+static void onDown()
 {
 	execute_action(A_DOWN, 0, 0);
 }
 
-static void onUp(void)
+static void onUp()
 {
 	execute_action(A_UP, 0, 0);
 }
