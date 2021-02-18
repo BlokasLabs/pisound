@@ -17,6 +17,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -102,6 +103,18 @@ static char g_config_path[MAX_PATH_LENGTH+1]  = "/etc/pisound.conf";
 enum { DEFAULT_CLICK_COUNT_LIMIT = 8 };
 
 static unsigned int g_click_count_limit = DEFAULT_CLICK_COUNT_LIMIT;
+static unsigned int g_debug = 1;
+
+static void debug( unsigned int level, const char *fmt, ...)
+{
+	va_list argp;
+	if (level <= g_debug) {
+		va_start(argp, fmt);
+		vfprintf(stderr,fmt,argp);
+		va_end(argp);
+	}
+}
+
 
 // Reads a line, truncates it if needed, seeks to the next line.
 static bool read_line(FILE *f, char *buffer, size_t n)
@@ -146,6 +159,7 @@ static void read_config_value(const char *conf, const char *value_name, char *ds
 			++currentLine;
 
 			argument[0] = '\0';
+			value[0] = '\0';
 
 			char *commentMarker = strchr(line, '#');
 			if (commentMarker)
@@ -157,40 +171,45 @@ static void read_config_value(const char *conf, const char *value_name, char *ds
 
 			static const char *WHITESPACE_CHARS = " \t";
 
+			// remove leading spaces
 			char *p = line + strspn(line, WHITESPACE_CHARS);
 
 			if (strlen(p) > 1)
 			{
 				char *t = strpbrk(p, WHITESPACE_CHARS);
 
+				// if there is whitespace after the name there may be a value
 				if (t)
 				{
 					strncpy(name, p, t - p);
 					name[t - p] = '\0';
-				}
 
-				t = t + strspn(t, WHITESPACE_CHARS);
 
-				if (args)
-				{
-					char *a1 = strpbrk(t, WHITESPACE_CHARS);
-					if (a1)
+					t = t + strspn(t, WHITESPACE_CHARS);
+
+					if (args)
 					{
-						char *a2 = a1 + strspn(a1, WHITESPACE_CHARS);
-						if (a2)
+						char *a1 = strpbrk(t, WHITESPACE_CHARS);
+						if (a1)
 						{
-							strcpy(argument, a2);
+							char *a2 = a1 + strspn(a1, WHITESPACE_CHARS);
+							if (a2)
+							{
+								strcpy(argument, a2);
+							}
+							*a1 = '\0';
 						}
-						*a1 = '\0';
 					}
+
+					strcpy(value, t);
+				} else {
+					strncpy(name, p, BUFFER_SIZE);
 				}
-
-				strcpy(value, t);
-
 				if (strlen(name) != 0)
 				{
 					if (strcmp(name, value_name) == 0)
 					{
+						debug( 4, "read_config_value located name %s\n", name );
 						size_t lenValue = strlen(value);
 						size_t lenArgs = strlen(argument);
 						if (lenValue < n && lenArgs < n)
@@ -226,6 +245,7 @@ static void read_config_value(const char *conf, const char *value_name, char *ds
 
 	if (!found)
 	{
+		debug( 4, "read_config_value did not find name %s\n", value_name );
 		strcpy(dst, default_value);
 		if (args)
 			*args = '\0';
@@ -265,6 +285,7 @@ static int get_action_name(enum action_e action, char * action_name, unsigned cl
 	default:
 		break;
 	}
+	debug(3, "action %u click count %u hold time %u (%u seconds) yields action name %s\n", action, click_count, hold_time, TICK_2_SECONDS(hold_time), action_name );
 	return 0;
 }
 
@@ -276,8 +297,9 @@ static void get_action_script(enum action_e action, char* action_name, char *buf
 	}
 
 	read_config_value(g_config_path, action_name, buffer, args, buff_length, "#");
-	// if buffer[0] == '0' then the entry did not exist in the config file.
-	if (buffer[0] == '\0')// No value was specified.
+	debug( 2, "read_config_value returned %s\n", buffer );
+	// if buffer[0] == '#' then the entry did not exist in the config file.
+	if (buffer[0] == '#')// entry was not specified -- use defaults.
 	{
 		bool found = false;
 		switch (action)
@@ -342,7 +364,7 @@ static void get_action_script(enum action_e action, char* action_name, char *buf
 	}
 }
 
-// 0 or an error (negative number).
+// length of command or an error (negative number).
 static int get_action_script_path(enum action_e action, char * action_name, unsigned click_count, unsigned hold_time, char *script, char *args, size_t n)
 {
 	if (action < 0 || action >= A_COUNT) {
@@ -360,7 +382,7 @@ static int get_action_script_path(enum action_e action, char * action_name, unsi
 
 	get_action_script(action, action_name, action_script, arguments, MAX_PATH_LENGTH );
 
-	fprintf(stderr, "script = '%s', args = '%s'\n", action_script, arguments);
+	debug(1, "script = '%s', args = '%s'\n", action_script, arguments);
 
 	if (action_script[0] == '\0')
 	{
@@ -390,7 +412,7 @@ static int get_action_script_path(enum action_e action, char * action_name, unsi
 	strncpy(args, arguments, n-1);
 	args[n-1] = '\0';
 
-	return 0;
+	return strlen(script);
 }
 
 static void execute_action(enum action_e action, unsigned click_count, unsigned hold_time)
@@ -401,15 +423,16 @@ static void execute_action(enum action_e action, unsigned click_count, unsigned 
 	int n = get_action_script_path(action, action_name, click_count, hold_time, cmd, arg, sizeof(cmd));
 	if (n < 0)
 	{
-		fprintf(stderr, "execute_action: getting script path for action %u click count %u hold time %u (%u seconds)resulted in error %d!\n", action, click_count, hold_time, TICK_2_SECONDS(hold_time), n);
+		debug(1, "execute_action: getting script path for action %u click count %u hold time %u (%u seconds) resulted in error %d!\n", action, click_count, hold_time, TICK_2_SECONDS(hold_time), n);
 		return;
 	}
 
-	if (cmd[0] == '\0')
+	if (n == 0)
 	{
-		fprintf(stderr, "execute_action: no command for action %s : click count %u hold time %u (%u seconds)\n", action_name, click_count, hold_time, TICK_2_SECONDS(hold_time));
+		debug(1, "execute_action: no command for action %s : click count %u hold time %u (%u seconds)\n", action_name, click_count, hold_time, TICK_2_SECONDS(hold_time));
 		return;
 	}
+	debug(2, "execute_action: action %u click count %u hold time %u (%u seconds)\ncmd %s\nargs %s\n", action, click_count, hold_time, TICK_2_SECONDS(hold_time), cmd, arg);
 	char *p = cmd + n;
 	size_t remainingSpace = sizeof(cmd) - n + 1;
 	int result = 0;
@@ -433,7 +456,7 @@ static void execute_action(enum action_e action, unsigned click_count, unsigned 
 		fprintf(stderr, "execute_action: failed setting up arguments for action %u, result: %d!\n", action, result);
 		return;
 	}
-
+	debug(2, "execute_action: executing %s\n", cmd );
 	system(cmd);
 }
 
@@ -932,7 +955,9 @@ static void print_usage(void)
 		"\t--gpio               The pin GPIO number to use for the button. Default is 17.\n"
 		"\t--conf               Specify the path to configuration file to use. Default is /etc/pisound.conf.\n"
 		"\t--press-count-limit  Set the press count limit. Use 0 for no limit. Default is 8.\n"
+		"\t--debug <n>          Enable debugging at level n (higher value = more logging)"
 		"\t-n                   Short for --click-count-limit.\n"
+		"\t-q                   Short for --debug 0 (turns off all but errors)\n"
 		"\n"
 		);
 	print_version();
@@ -1008,6 +1033,29 @@ int main(int argc, char **argv, char **envp)
 		{
 			print_version();
 			return 0;
+		}
+		else if (strcmp(argv[i], "--debug") == 0)
+		{
+			if (i + 1 < argc )
+			{
+				unsigned int x;
+				if (parse_uint(&x, argv[i+1]))
+				{
+					g_debug = x;
+					click_count_limit_specified = true;
+					++i;
+				}
+			}
+			else
+			{
+				printf("Missing numeric argument for '%s'!\n", argv[i]);
+				print_usage();
+				return 1;
+			}
+		}
+		else if (strcmp(argv[i], "-q") == 0)
+		{
+			g_debug = 0;
 		}
 		else if (strcmp(argv[i], "--conf") == 0)
 		{
