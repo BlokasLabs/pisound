@@ -1042,7 +1042,6 @@ int main(int argc, char **argv, char **envp)
 				if (parse_uint(&x, argv[i+1]))
 				{
 					g_debug = x;
-					click_count_limit_specified = true;
 					++i;
 				}
 			}
