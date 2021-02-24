@@ -34,15 +34,15 @@
 #include <signal.h>
 #include <libgen.h>
 
-#define HOMEPAGE_URL "https://blokas.io/pisound"
+#define HOMEPAGE_URL "https://blokas.io/pisound/"
 #define UPDATE_URL   HOMEPAGE_URL "/updates?btnv=%x.%02x&v=%s&sn=%s&id=%s"
 
-enum { PISOUND_BTN_VERSION     = 0x0111 };
+enum { PISOUND_BTN_VERSION     = 0x0112 };
 enum { INVALID_VERSION         = 0xffff };
 enum { CLICK_TIMEOUT_MS        = 400    };
 enum { HOLD_PRESS_TIMEOUT_MS   = CLICK_TIMEOUT_MS };
 
-#define BASE_PISOUND_DIR "usr/local/pisound"
+#define BASE_PISOUND_DIR "/usr/local/pisound"
 #define BASE_SCRIPTS_DIR BASE_PISOUND_DIR "/scripts/pisound-btn"
 
 static int g_button_pin = 17;
