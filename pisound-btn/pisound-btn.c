@@ -993,7 +993,7 @@ static void print_usage(void)
 		"\t--help               Display the usage information.\n"
 		"\t--version            Show the version information.\n"
 		"\t--gpio               The pin GPIO number to use for the button. Default is 17.\n"
-	    "\t--active_low         Reverse the sense of the active state.  Normally active is when GPIO goes high\n"
+		"\t--active_low         Reverse the sense of the active state.  Normally active is when GPIO goes high\n"
 		"\t--conf               Specify the path to configuration file to use. Default is /etc/pisound.conf.\n"
 		"\t--press-count-limit  Set the press count limit. Use 0 for no limit. Default is 8.\n"
 		"\t--debug <n>          Enable debugging at level n (higher value = more logging)"
