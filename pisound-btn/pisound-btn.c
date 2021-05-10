@@ -631,7 +631,7 @@ static int gpio_set_active_low(int pin, bool state)
 		return -1;
 	}
 
-	int result = write(fd, g_active_low, 1);
+	int result = write(fd, state?"1":"0", 1);
 	if (result != 1)
 	{
 		fprintf(stderr, "Failed writing to %s! Error %d.\n", gpio, errno);
@@ -990,15 +990,15 @@ static void print_usage(void)
 {
 	printf("Usage: pisound-btn [options]\n"
 		"Options:\n"
-		"\t--help               Display the usage information.\n"
-		"\t--version            Show the version information.\n"
-		"\t--gpio               The pin GPIO number to use for the button. Default is 17.\n"
-		"\t--active_low         Reverse the sense of the active state.  Normally active is when GPIO goes high\n"
-		"\t--conf               Specify the path to configuration file to use. Default is /etc/pisound.conf.\n"
-		"\t--press-count-limit  Set the press count limit. Use 0 for no limit. Default is 8.\n"
-		"\t--debug <n>          Enable debugging at level n (higher value = more logging)"
-		"\t-n                   Short for --press-count-limit.\n"
-		"\t-q                   Short for --debug 0 (turns off all but errors)\n"
+		"\t--help                   Display the usage information.\n"
+		"\t--version                Show the version information.\n"
+		"\t--gpio <n>               The pin GPIO number to use for the button. Default is 17.\n"
+		"\t--active-low             Reverse the sense of the active state.  Normally active is when GPIO goes high\n"
+		"\t--conf <path>            Specify the path to configuration file to use. Default is /etc/pisound.conf.\n"
+		"\t--click-count-limit <n>  Set the click count limit to n. Use 0 for no limit. Default is 8.\n"
+		"\t--debug <n>              Enable debugging at level n (higher value = more logging)\n"
+		"\t-n <n>                   Short for --click-count-limit.\n"
+		"\t-q                       Short for --debug 0 (turns off all but errors)\n"
 		"\n"
 		);
 	print_version();
@@ -1162,7 +1162,7 @@ int main(int argc, char **argv, char **envp)
 				return 1;
 			}
 		}
-		else if (strcmp(argv[i], "--active_low") == 0)
+		else if (strcmp(argv[i], "--active-low") == 0)
 		{
 			g_active_low=true;
 		}
