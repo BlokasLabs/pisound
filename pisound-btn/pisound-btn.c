@@ -1168,10 +1168,10 @@ int main(int argc, char **argv, char **envp)
 		{
 			g_active_low=true;
 		}
-        else if (strcmp(argv[i], "--no-defaults") == 0)
-        {
-            g_use_default=false;
-        }
+		else if (strcmp(argv[i], "--no-defaults") == 0)
+		{
+			g_use_default=false;
+		}
 		else
 		{
 			printf("Unknown option '%s'.\n", argv[i]);
