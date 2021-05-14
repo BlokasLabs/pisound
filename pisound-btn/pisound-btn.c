@@ -1022,7 +1022,7 @@ static bool parse_uint(unsigned int *dst, const char *src)
 static bool read_config_uint(const char *conf, const char *value_name, unsigned int *dst, unsigned int default_value)
 {
 	char buffer[12];
-	read_config_value(conf, CLICK_COUNT_LIMIT_VALUE_NAME, buffer, NULL, sizeof(buffer), "#");
+	read_config_value(conf, value_name, buffer, NULL, sizeof(buffer), "#");
 	if (buffer[0] == '#') // No value was specified.
 	{
 		*dst = default_value;
