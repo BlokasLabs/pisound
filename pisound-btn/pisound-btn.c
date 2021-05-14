@@ -46,6 +46,7 @@ enum { HOLD_PRESS_TIMEOUT_MS   = CLICK_TIMEOUT_MS };
 #define BASE_SCRIPTS_DIR BASE_PISOUND_DIR "/scripts/pisound-btn"
 
 static int g_button_pin = 17;
+static bool g_active_low = false;
 static bool g_button_exported = false;
 
 enum action_e
@@ -611,6 +612,41 @@ static int gpio_set_edge(int pin, enum edge_e edge)
 	return 0;
 }
 
+static int gpio_set_active_low(int pin, bool state)
+{
+	if (!gpio_is_pin_valid(pin))
+	{
+		fprintf(stderr, "Invalid pin number %d!\n", pin);
+		return -1;
+	}
+
+	char gpio[64];
+
+	snprintf(gpio, sizeof(gpio), "/sys/class/gpio/gpio%d/active_low", pin);
+
+	int fd = open(gpio, O_WRONLY);
+	if (fd == -1)
+	{
+		fprintf(stderr, "Failed to open %s! Error %d.\n", gpio, errno);
+		return -1;
+	}
+
+	int result = write(fd, state?"1":"0", 1);
+	if (result != 1)
+	{
+		fprintf(stderr, "Failed writing to %s! Error %d.\n", gpio, errno);
+		close(fd);
+		return -1;
+	}
+	int err = close(fd);
+	if (err != 0)
+	{
+		fprintf(stderr, "Failed closing %s! Error %d.\n", gpio, errno);
+		return -1;
+	}
+	return 0;
+}
+
 static int gpio_open(int pin)
 {
 	if (!gpio_is_pin_valid(pin))
@@ -808,6 +844,10 @@ static int run(void)
 	if (err < 0) return err;
 	else g_button_exported = (err == 1);
 
+	err = gpio_set_active_low(g_button_pin, g_active_low);
+	if (err != 0)
+		return err;
+
 	err = gpio_set_edge(g_button_pin, E_BOTH);
 
 	if (err != 0)
@@ -950,14 +990,15 @@ static void print_usage(void)
 {
 	printf("Usage: pisound-btn [options]\n"
 		"Options:\n"
-		"\t--help               Display the usage information.\n"
-		"\t--version            Show the version information.\n"
-		"\t--gpio               The pin GPIO number to use for the button. Default is 17.\n"
-		"\t--conf               Specify the path to configuration file to use. Default is /etc/pisound.conf.\n"
-		"\t--press-count-limit  Set the press count limit. Use 0 for no limit. Default is 8.\n"
-		"\t--debug <n>          Enable debugging at level n (higher value = more logging)"
-		"\t-n                   Short for --click-count-limit.\n"
-		"\t-q                   Short for --debug 0 (turns off all but errors)\n"
+		"\t--help                   Display the usage information.\n"
+		"\t--version                Show the version information.\n"
+		"\t--gpio <n>               The pin GPIO number to use for the button. Default is 17.\n"
+		"\t--active-low             Reverse the sense of the active state.  Normally active is when GPIO goes high\n"
+		"\t--conf <path>            Specify the path to configuration file to use. Default is /etc/pisound.conf.\n"
+		"\t--click-count-limit <n>  Set the click count limit to n. Use 0 for no limit. Default is 8.\n"
+		"\t--debug <n>              Enable debugging at level n (higher value = more logging)\n"
+		"\t-n <n>                   Short for --click-count-limit.\n"
+		"\t-q                       Short for --debug 0 (turns off all but errors)\n"
 		"\n"
 		);
 	print_version();
@@ -1120,6 +1161,10 @@ int main(int argc, char **argv, char **envp)
 				print_usage();
 				return 1;
 			}
+		}
+		else if (strcmp(argv[i], "--active-low") == 0)
+		{
+			g_active_low=true;
 		}
 		else
 		{
