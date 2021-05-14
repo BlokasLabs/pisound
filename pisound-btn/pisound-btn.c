@@ -997,7 +997,7 @@ static void print_usage(void)
 		"\t--active-low             Reverse the sense of the active state.  Normally active is when GPIO goes high\n"
 		"\t--conf <path>            Specify the path to configuration file to use. Default is /etc/pisound.conf.\n"
 		"\t--click-count-limit <n>  Set the click count limit to n. Use 0 for no limit. Default is 8.\n"
-		"\t--no-defaults            Do not use the default values for click and hold.  Only configuraiton options will be used.\n"
+		"\t--no-defaults            Do not use the default values for click and hold.  Only configuration options will be used.\n"
 		"\t--debug <n>              Enable debugging at level n (higher value = more logging)\n"
 		"\t-n <n>                   Short for --click-count-limit.\n"
 		"\t-q                       Short for --debug 0 (turns off all but errors)\n"
