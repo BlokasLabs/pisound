@@ -47,6 +47,7 @@ enum { HOLD_PRESS_TIMEOUT_MS   = CLICK_TIMEOUT_MS };
 
 static int g_button_pin = 17;
 static bool g_active_low = false;
+static bool g_use_default = true;
 static bool g_button_exported = false;
 
 enum action_e
@@ -300,37 +301,37 @@ static void get_action_script(enum action_e action, char* action_name, char *buf
 	read_config_value(g_config_path, action_name, buffer, args, buff_length, "#");
 	debug( 2, "read_config_value returned %s\n", buffer );
 	// if buffer[0] == '#' then the entry did not exist in the config file.
-	if (buffer[0] == '#')// entry was not specified -- use defaults.
+	if (buffer[0] == '#' && g_use_default)// entry was not specified -- use defaults.
 	{
 		bool found = false;
 		switch (action)
 		{
 		case A_UP:
-			strcpy( buffer, DEFAULT_UP );
+			strncpy( buffer, DEFAULT_UP, MAX_PATH_LENGTH );
 			if (args)
 				args[0] = '\0';
 			break;
 		case A_DOWN:
-			strcpy( buffer, DEFAULT_DOWN );
+			strncpy( buffer, DEFAULT_DOWN, MAX_PATH_LENGTH );
 			if (args)
 				args[0] = '\0';
 			break;
 		case A_CLICK:
 			if (strcmp("CLICK_1", action_name) == 0)
 			{
-				strcpy( buffer, DEFAULT_CLICK_1 );
+				strncpy( buffer, DEFAULT_CLICK_1, MAX_PATH_LENGTH );
 				if (args)
 					args[0] = '\0';
 			}
 			else if (strcmp("CLICK_2", action_name) == 0)
 			{
-				strcpy( buffer, DEFAULT_CLICK_2 );
+				strncpy( buffer, DEFAULT_CLICK_2, MAX_PATH_LENGTH );
 				if (args)
 					args[0] = '\0';
 			}
 			else if (strcmp("CLICK_3", action_name) == 0)
 			{
-				strcpy( buffer, DEFAULT_CLICK_3 );
+				strncpy( buffer, DEFAULT_CLICK_3, MAX_PATH_LENGTH );
 				if (args)
 					args[0] = '\0';
 			}
@@ -342,13 +343,13 @@ static void get_action_script(enum action_e action, char* action_name, char *buf
 		case A_HOLD:
 			if (strcmp("HOLD_3S", action_name) == 0)
 			{
-				strcpy( buffer, DEFAULT_HOLD_3S );
+				strncpy( buffer, DEFAULT_HOLD_3S, MAX_PATH_LENGTH );
 				if (args)
 					args[0] = '\0';
 			}
 			else if (strcmp("HOLD_5S", action_name) == 0)
 			{
-				strcpy( buffer, DEFAULT_HOLD_5S );
+				strncpy( buffer, DEFAULT_HOLD_5S, MAX_PATH_LENGTH );
 				if (args)
 					args[0] = '\0';
 			} else {
@@ -996,6 +997,7 @@ static void print_usage(void)
 		"\t--active-low             Reverse the sense of the active state.  Normally active is when GPIO goes high\n"
 		"\t--conf <path>            Specify the path to configuration file to use. Default is /etc/pisound.conf.\n"
 		"\t--click-count-limit <n>  Set the click count limit to n. Use 0 for no limit. Default is 8.\n"
+		"\t--no-defaults            Do not use the default values for click and hold.  Only configuraiton options will be used.\n"
 		"\t--debug <n>              Enable debugging at level n (higher value = more logging)\n"
 		"\t-n <n>                   Short for --click-count-limit.\n"
 		"\t-q                       Short for --debug 0 (turns off all but errors)\n"
@@ -1165,6 +1167,10 @@ int main(int argc, char **argv, char **envp)
 		else if (strcmp(argv[i], "--active-low") == 0)
 		{
 			g_active_low=true;
+		}
+		else if (strcmp(argv[i], "--no-defaults") == 0)
+		{
+			g_use_default=false;
 		}
 		else
 		{
