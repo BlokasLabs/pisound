@@ -156,7 +156,7 @@ static void read_config_value(const char *conf, const char *value_name, char *ds
 
 	while (f && !feof(f))
 	{
-		if (read_line(f, line, sizeof(line)))
+		if (read_line(f, line, BUFFER_SIZE))
 		{
 			++currentLine;
 
@@ -205,7 +205,7 @@ static void read_config_value(const char *conf, const char *value_name, char *ds
 
 					strcpy(value, t);
 				} else {
-					strncpy(name, p, BUFFER_SIZE);
+					strcpy(name, p);
 				}
 				if (strlen(name) != 0)
 				{
@@ -291,47 +291,56 @@ static int get_action_name(enum action_e action, char * action_name, unsigned cl
 	return 0;
 }
 
+/*
+ * buff_length is the buffer length available for input, (actual length -1 )
+ */
 static void get_action_script(enum action_e action, char* action_name, char *buffer, char* args, unsigned int buff_length)
 {
 	if (action_name[0] == '\0')
 	{
 		buffer[0] = '\0';
 	}
-
 	read_config_value(g_config_path, action_name, buffer, args, buff_length, "#");
 	debug( 2, "read_config_value returned %s\n", buffer );
 	// if buffer[0] == '#' then the entry did not exist in the config file.
-	if (buffer[0] == '#' && g_use_default)// entry was not specified -- use defaults.
+	if (buffer[0] == '#')// entry was not specified -- use defaults.
 	{
+		buffer[buff_length] = 0;
 		bool found = false;
 		switch (action)
 		{
 		case A_UP:
-			strncpy( buffer, DEFAULT_UP, MAX_PATH_LENGTH );
-			if (args)
-				args[0] = '\0';
+			if  (g_use_default) 
+			{
+				strcpy( buffer, DEFAULT_UP );
+				if (args)
+					args[0] = '\0';
+			}
 			break;
 		case A_DOWN:
-			strncpy( buffer, DEFAULT_DOWN, MAX_PATH_LENGTH );
-			if (args)
-				args[0] = '\0';
+			if  (g_use_default) 
+			{
+				strcpy( buffer, DEFAULT_DOWN );
+				if (args)
+					args[0] = '\0';
+			}
 			break;
 		case A_CLICK:
-			if (strcmp("CLICK_1", action_name) == 0)
+			if (strcmp("CLICK_1", action_name) == 0 && g_use_default) 
 			{
-				strncpy( buffer, DEFAULT_CLICK_1, MAX_PATH_LENGTH );
+				strcpy( buffer, DEFAULT_CLICK_1 );
 				if (args)
 					args[0] = '\0';
 			}
-			else if (strcmp("CLICK_2", action_name) == 0)
+			else if (strcmp("CLICK_2", action_name) == 0 && g_use_default)
 			{
-				strncpy( buffer, DEFAULT_CLICK_2, MAX_PATH_LENGTH );
+				strcpy( buffer, DEFAULT_CLICK_2 );
 				if (args)
 					args[0] = '\0';
 			}
-			else if (strcmp("CLICK_3", action_name) == 0)
+			else if (strcmp("CLICK_3", action_name) == 0 && g_use_default)
 			{
-				strncpy( buffer, DEFAULT_CLICK_3, MAX_PATH_LENGTH );
+				strcpy( buffer, DEFAULT_CLICK_3 );
 				if (args)
 					args[0] = '\0';
 			}
@@ -341,15 +350,15 @@ static void get_action_script(enum action_e action, char* action_name, char *buf
 			}
 			break;
 		case A_HOLD:
-			if (strcmp("HOLD_3S", action_name) == 0)
+			if (strcmp("HOLD_3S", action_name) == 0 && g_use_default)
 			{
-				strncpy( buffer, DEFAULT_HOLD_3S, MAX_PATH_LENGTH );
+				strcpy( buffer, DEFAULT_HOLD_3S );
 				if (args)
 					args[0] = '\0';
 			}
-			else if (strcmp("HOLD_5S", action_name) == 0)
+			else if (strcmp("HOLD_5S", action_name) == 0 && g_use_default)
 			{
-				strncpy( buffer, DEFAULT_HOLD_5S, MAX_PATH_LENGTH );
+				strcpy( buffer, DEFAULT_HOLD_5S );
 				if (args)
 					args[0] = '\0';
 			} else {
