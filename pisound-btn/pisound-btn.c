@@ -205,7 +205,7 @@ static void read_config_value(const char *conf, const char *value_name, char *ds
 
 					strcpy(value, t);
 				} else {
-					strcpy(name, p);
+					strncpy(name, p, BUFFER_SIZE);
 				}
 				if (strlen(name) != 0)
 				{
