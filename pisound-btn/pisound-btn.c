@@ -45,8 +45,15 @@ enum { HOLD_PRESS_TIMEOUT_MS   = CLICK_TIMEOUT_MS };
 #define BASE_PISOUND_DIR "/usr/local/pisound"
 #define BASE_SCRIPTS_DIR BASE_PISOUND_DIR "/scripts/pisound-btn"
 
+enum PinActivation
+{
+	PA_UNSPECIFIED = 0,
+	PA_ACTIVE_LOW  = 1,
+	PA_ACTIVE_HIGH = 2
+};
+
 static int g_button_pin = 17;
-static bool g_active_low = false;
+static enum PinActivation g_pin_activation = PA_UNSPECIFIED;
 static bool g_use_default = true;
 static bool g_button_exported = false;
 
@@ -854,9 +861,12 @@ static int run(void)
 	if (err < 0) return err;
 	else g_button_exported = (err == 1);
 
-	err = gpio_set_active_low(g_button_pin, g_active_low);
-	if (err != 0)
-		return err;
+	if (g_pin_activation == PA_ACTIVE_LOW || g_pin_activation == PA_ACTIVE_HIGH)
+	{
+		err = gpio_set_active_low(g_button_pin, g_pin_activation == PA_ACTIVE_LOW);
+		if (err != 0)
+			return err;
+	}
 
 	err = gpio_set_edge(g_button_pin, E_BOTH);
 
@@ -1003,10 +1013,12 @@ static void print_usage(void)
 		"\t--help                   Display the usage information.\n"
 		"\t--version                Show the version information.\n"
 		"\t--gpio <n>               The pin GPIO number to use for the button. Default is 17.\n"
-		"\t--active-low             Reverse the sense of the active state.  Normally active is when GPIO goes high\n"
+		"\t--active-high            Configure the pin for active high triggering.\n"
+		"\t--active-low             Reverse the sense of the active state.\n"
+		"\t                         If none of --active-high or --active-low is specified, this GPIO setting is left as is.\n"
 		"\t--conf <path>            Specify the path to configuration file to use. Default is /etc/pisound.conf.\n"
 		"\t--click-count-limit <n>  Set the click count limit to n. Use 0 for no limit. Default is 8.\n"
-		"\t--no-defaults            Do not use the default values for click and hold.  Only configuration options will be used.\n"
+		"\t--no-defaults            Do not use the default values for click and hold. Only configuration options will be used.\n"
 		"\t--debug <n>              Enable debugging at level n (higher value = more logging)\n"
 		"\t-n <n>                   Short for --click-count-limit.\n"
 		"\t-q                       Short for --debug 0 (turns off all but errors)\n"
@@ -1175,7 +1187,11 @@ int main(int argc, char **argv, char **envp)
 		}
 		else if (strcmp(argv[i], "--active-low") == 0)
 		{
-			g_active_low=true;
+			g_pin_activation = PA_ACTIVE_LOW;
+		}
+		else if (strcmp(argv[i], "--active-high") == 0)
+		{
+			g_pin_activation = PA_ACTIVE_HIGH;
 		}
 		else if (strcmp(argv[i], "--no-defaults") == 0)
 		{
