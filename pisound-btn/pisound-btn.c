@@ -37,7 +37,7 @@
 #define HOMEPAGE_URL "https://blokas.io/pisound/"
 #define UPDATE_URL   HOMEPAGE_URL "/updates?btnv=%x.%02x&v=%s&sn=%s&id=%s"
 
-enum { PISOUND_BTN_VERSION     = 0x0112 };
+enum { PISOUND_BTN_VERSION     = 0x0113 };
 enum { INVALID_VERSION         = 0xffff };
 enum { CLICK_TIMEOUT_MS        = 400    };
 enum { HOLD_PRESS_TIMEOUT_MS   = CLICK_TIMEOUT_MS };
@@ -45,7 +45,16 @@ enum { HOLD_PRESS_TIMEOUT_MS   = CLICK_TIMEOUT_MS };
 #define BASE_PISOUND_DIR "/usr/local/pisound"
 #define BASE_SCRIPTS_DIR BASE_PISOUND_DIR "/scripts/pisound-btn"
 
+enum PinActivation
+{
+	PA_UNSPECIFIED = 0,
+	PA_ACTIVE_LOW  = 1,
+	PA_ACTIVE_HIGH = 2
+};
+
 static int g_button_pin = 17;
+static enum PinActivation g_pin_activation = PA_UNSPECIFIED;
+static bool g_use_default = true;
 static bool g_button_exported = false;
 
 enum action_e
@@ -154,7 +163,7 @@ static void read_config_value(const char *conf, const char *value_name, char *ds
 
 	while (f && !feof(f))
 	{
-		if (read_line(f, line, sizeof(line)))
+		if (read_line(f, line, BUFFER_SIZE))
 		{
 			++currentLine;
 
@@ -289,45 +298,54 @@ static int get_action_name(enum action_e action, char * action_name, unsigned cl
 	return 0;
 }
 
+/*
+ * buff_length is the buffer length available for input, (actual length -1 )
+ */
 static void get_action_script(enum action_e action, char* action_name, char *buffer, char* args, unsigned int buff_length)
 {
 	if (action_name[0] == '\0')
 	{
 		buffer[0] = '\0';
 	}
-
 	read_config_value(g_config_path, action_name, buffer, args, buff_length, "#");
 	debug( 2, "read_config_value returned %s\n", buffer );
 	// if buffer[0] == '#' then the entry did not exist in the config file.
 	if (buffer[0] == '#')// entry was not specified -- use defaults.
 	{
+		buffer[buff_length] = 0;
 		bool found = false;
 		switch (action)
 		{
 		case A_UP:
-			strcpy( buffer, DEFAULT_UP );
-			if (args)
-				args[0] = '\0';
+			if  (g_use_default) 
+			{
+				strcpy( buffer, DEFAULT_UP );
+				if (args)
+					args[0] = '\0';
+			}
 			break;
 		case A_DOWN:
-			strcpy( buffer, DEFAULT_DOWN );
-			if (args)
-				args[0] = '\0';
+			if  (g_use_default) 
+			{
+				strcpy( buffer, DEFAULT_DOWN );
+				if (args)
+					args[0] = '\0';
+			}
 			break;
 		case A_CLICK:
-			if (strcmp("CLICK_1", action_name) == 0)
+			if (strcmp("CLICK_1", action_name) == 0 && g_use_default) 
 			{
 				strcpy( buffer, DEFAULT_CLICK_1 );
 				if (args)
 					args[0] = '\0';
 			}
-			else if (strcmp("CLICK_2", action_name) == 0)
+			else if (strcmp("CLICK_2", action_name) == 0 && g_use_default)
 			{
 				strcpy( buffer, DEFAULT_CLICK_2 );
 				if (args)
 					args[0] = '\0';
 			}
-			else if (strcmp("CLICK_3", action_name) == 0)
+			else if (strcmp("CLICK_3", action_name) == 0 && g_use_default)
 			{
 				strcpy( buffer, DEFAULT_CLICK_3 );
 				if (args)
@@ -339,13 +357,13 @@ static void get_action_script(enum action_e action, char* action_name, char *buf
 			}
 			break;
 		case A_HOLD:
-			if (strcmp("HOLD_3S", action_name) == 0)
+			if (strcmp("HOLD_3S", action_name) == 0 && g_use_default)
 			{
 				strcpy( buffer, DEFAULT_HOLD_3S );
 				if (args)
 					args[0] = '\0';
 			}
-			else if (strcmp("HOLD_5S", action_name) == 0)
+			else if (strcmp("HOLD_5S", action_name) == 0 && g_use_default)
 			{
 				strcpy( buffer, DEFAULT_HOLD_5S );
 				if (args)
@@ -611,6 +629,41 @@ static int gpio_set_edge(int pin, enum edge_e edge)
 	return 0;
 }
 
+static int gpio_set_active_low(int pin, bool state)
+{
+	if (!gpio_is_pin_valid(pin))
+	{
+		fprintf(stderr, "Invalid pin number %d!\n", pin);
+		return -1;
+	}
+
+	char gpio[64];
+
+	snprintf(gpio, sizeof(gpio), "/sys/class/gpio/gpio%d/active_low", pin);
+
+	int fd = open(gpio, O_WRONLY);
+	if (fd == -1)
+	{
+		fprintf(stderr, "Failed to open %s! Error %d.\n", gpio, errno);
+		return -1;
+	}
+
+	int result = write(fd, state?"1":"0", 1);
+	if (result != 1)
+	{
+		fprintf(stderr, "Failed writing to %s! Error %d.\n", gpio, errno);
+		close(fd);
+		return -1;
+	}
+	int err = close(fd);
+	if (err != 0)
+	{
+		fprintf(stderr, "Failed closing %s! Error %d.\n", gpio, errno);
+		return -1;
+	}
+	return 0;
+}
+
 static int gpio_open(int pin)
 {
 	if (!gpio_is_pin_valid(pin))
@@ -808,6 +861,13 @@ static int run(void)
 	if (err < 0) return err;
 	else g_button_exported = (err == 1);
 
+	if (g_pin_activation == PA_ACTIVE_LOW || g_pin_activation == PA_ACTIVE_HIGH)
+	{
+		err = gpio_set_active_low(g_button_pin, g_pin_activation == PA_ACTIVE_LOW);
+		if (err != 0)
+			return err;
+	}
+
 	err = gpio_set_edge(g_button_pin, E_BOTH);
 
 	if (err != 0)
@@ -950,14 +1010,18 @@ static void print_usage(void)
 {
 	printf("Usage: pisound-btn [options]\n"
 		"Options:\n"
-		"\t--help               Display the usage information.\n"
-		"\t--version            Show the version information.\n"
-		"\t--gpio               The pin GPIO number to use for the button. Default is 17.\n"
-		"\t--conf               Specify the path to configuration file to use. Default is /etc/pisound.conf.\n"
-		"\t--press-count-limit  Set the press count limit. Use 0 for no limit. Default is 8.\n"
-		"\t--debug <n>          Enable debugging at level n (higher value = more logging)"
-		"\t-n                   Short for --click-count-limit.\n"
-		"\t-q                   Short for --debug 0 (turns off all but errors)\n"
+		"\t--help                   Display the usage information.\n"
+		"\t--version                Show the version information.\n"
+		"\t--gpio <n>               The pin GPIO number to use for the button. Default is 17.\n"
+		"\t--active-high            Configure the pin for active high triggering.\n"
+		"\t--active-low             Reverse the sense of the active state.\n"
+		"\t                         If none of --active-high or --active-low is specified, this GPIO setting is left as is.\n"
+		"\t--conf <path>            Specify the path to configuration file to use. Default is /etc/pisound.conf.\n"
+		"\t--click-count-limit <n>  Set the click count limit to n. Use 0 for no limit. Default is 8.\n"
+		"\t--no-defaults            Do not use the default values for click and hold. Only configuration options will be used.\n"
+		"\t--debug <n>              Enable debugging at level n (higher value = more logging)\n"
+		"\t-n <n>                   Short for --click-count-limit.\n"
+		"\t-q                       Short for --debug 0 (turns off all but errors)\n"
 		"\n"
 		);
 	print_version();
@@ -979,7 +1043,7 @@ static bool parse_uint(unsigned int *dst, const char *src)
 static bool read_config_uint(const char *conf, const char *value_name, unsigned int *dst, unsigned int default_value)
 {
 	char buffer[12];
-	read_config_value(conf, CLICK_COUNT_LIMIT_VALUE_NAME, buffer, NULL, sizeof(buffer), "#");
+	read_config_value(conf, value_name, buffer, NULL, sizeof(buffer), "#");
 	if (buffer[0] == '#') // No value was specified.
 	{
 		*dst = default_value;
@@ -1120,6 +1184,18 @@ int main(int argc, char **argv, char **envp)
 				print_usage();
 				return 1;
 			}
+		}
+		else if (strcmp(argv[i], "--active-low") == 0)
+		{
+			g_pin_activation = PA_ACTIVE_LOW;
+		}
+		else if (strcmp(argv[i], "--active-high") == 0)
+		{
+			g_pin_activation = PA_ACTIVE_HIGH;
+		}
+		else if (strcmp(argv[i], "--no-defaults") == 0)
+		{
+			g_use_default=false;
 		}
 		else
 		{
