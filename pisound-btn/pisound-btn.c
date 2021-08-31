@@ -105,10 +105,17 @@ static char g_config_path[MAX_PATH_LENGTH+1]  = "/etc/pisound.conf";
 #define ABSOLUTE_MAX_CLICK 99
 // printf( HOLD_%uS", ABSOLUTE_MAX_HOLD) must fit in ACTION_NAME_SIZE
 #define ABSOLUTE_MAX_HOLD 99
-// convert ticks to seconds so the [0,2) == 1, [2,4) == 3, [4,6) == 5
-#define TICK_2_SECONDS(x) (x/1000 + (x%2))
+// convert ticks to seconds based on global options g_full_time and g_centered_time
+#define TICK_2_SECONDS(x) seconds(x)
 
 
+static bool g_full_time = false;
+static bool g_offset_time = false;
+
+static int seconds( int ticks ) {
+	int sec = (g_offset_time?ticks+500:ticks)/1000;
+	return g_full_time ? sec : sec+((sec+1)%2);
+}
 enum { DEFAULT_CLICK_COUNT_LIMIT = 8 };
 
 static unsigned int g_click_count_limit = DEFAULT_CLICK_COUNT_LIMIT;
@@ -1022,11 +1029,63 @@ static void print_usage(void)
 		"\t--debug <n>              Enable debugging at level n (higher value = more logging)\n"
 		"\t-n <n>                   Short for --click-count-limit.\n"
 		"\t-q                       Short for --debug 0 (turns off all but errors)\n"
+		"\t--full-time              Return both odd and even times in events.  Default is to only return odd second counts (--help-time for more details).\n"
+		"\t--offset-time            Offset the start and end times by 1/2 second (--help-time for more details).\n"
+		"\t--help-time              Explain the time options above.\n"
 		"\n"
 		);
 	print_version();
 }
 
+static void print_time_help(void)
+{
+	printf("By default pisound-btn reports only odd seconds as follows:\n"
+			"\t+--------------------------------+\n"
+			"\t|      | Upto but not | reported |\n"
+			"\t| From |  including   | seconds  |\n"
+			"\t|------+--------------+----------|\n"
+			"\t|  0   |      2       |    1     |\n"
+			"\t|  2   |      4       |    3     |\n"
+			"\t|  4   |      6       |    5     |\n"
+			"\t+--------------------------------+\n"
+			"\n"
+			"\n"
+			"if --full-time is specified the seconds are reported as:\n"
+			"\t+--------------------------------+\n"
+			"\t|      | Upto but not | reported |\n"
+			"\t| From |  including   | seconds  |\n"
+			"\t|------+--------------+----------|\n"
+			"\t|  0   |      1       |    0     |\n"
+			"\t|  1   |      2       |    1     |\n"
+			"\t|  2   |      3       |    2     |\n"
+			"\t|  3   |      4       |    3     |\n"
+			"\t+--------------------------------+\n"
+			"\n"
+			"\n"
+			"if --offset-time is specified the seconds are reported as:\n"
+			"\t+--------------------------------+\n"
+			"\t|      | Upto but not | reported |\n"
+			"\t| From |  including   | seconds  |\n"
+			"\t|------+--------------+----------|\n"
+			"\t|  0   |     1.5      |    1     |\n"
+			"\t|  1.5 |     3.5      |    3     |\n"
+			"\t|  3.5 |     5.5      |    5     |\n"
+			"\t+--------------------------------+\n"
+			"\n"
+			"\n"
+			"if --full-time and --offset-time is specified the seconds are reported as:\n"
+			"\t+--------------------------------+\n"
+			"\t|      | Upto but not | reported |\n"
+			"\t| From |  including   | seconds  |\n"
+			"\t|------+--------------+----------|\n"
+			"\t|  0   |     0.5      |    0     |\n"
+			"\t|  0.5 |     1.5      |    1     |\n"
+			"\t|  1.5 |     2.5      |    2     |\n"
+			"\t|  2.5 |     3.5      |    3     |\n"
+			"\t+--------------------------------+\n"
+		"\n"
+		);
+}
 static bool parse_uint(unsigned int *dst, const char *src)
 {
 	char * endPtr;
@@ -1096,6 +1155,19 @@ int main(int argc, char **argv, char **envp)
 		else if (strcmp(argv[i], "--version") == 0)
 		{
 			print_version();
+			return 0;
+		}
+		else if (strcmp(argv[i], "--full-time") == 0)
+		{
+			g_full_time=true;
+		}
+		else if (strcmp(argv[i], "--offset-time") == 0)
+		{
+			g_offset_time=true;
+		}
+		else if (strcmp(argv[i], "--help-time") == 0)
+		{
+			print_time_help();
 			return 0;
 		}
 		else if (strcmp(argv[i], "--debug") == 0)
