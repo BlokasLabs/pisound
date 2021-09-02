@@ -112,9 +112,16 @@ static char g_config_path[MAX_PATH_LENGTH+1]  = "/etc/pisound.conf";
 static bool g_full_time = false;
 static bool g_offset_time = false;
 
+// converts ticks to seconds
 static int seconds( int ticks ) {
+
 	int sec = (g_offset_time?ticks+500:ticks)/1000;
-	return g_full_time ? sec : sec+((sec+1)%2);
+	int result = g_full_time ? sec : sec+((sec+1)%2);
+	// duplicate original timing that started at 3
+	if (!g_full_time && sec<=1) {
+		result=3;
+	}
+	return result;
 }
 enum { DEFAULT_CLICK_COUNT_LIMIT = 8 };
 
@@ -1039,14 +1046,15 @@ static void print_usage(void)
 
 static void print_time_help(void)
 {
-	printf("By default pisound-btn reports only odd seconds as follows:\n"
+	printf("Pisound only reports hold times if the button is held more than 0.4 seconds.\n"
+			"By default pisound-btn reports only odd seconds as follows:\n"
 			"\t+--------------------------------+\n"
 			"\t|      | Upto but not | reported |\n"
 			"\t| From |  including   | seconds  |\n"
 			"\t|------+--------------+----------|\n"
-			"\t|  0   |      2       |    1     |\n"
-			"\t|  2   |      4       |    3     |\n"
+			"\t|  0.4 |      4       |    3     |\n"
 			"\t|  4   |      6       |    5     |\n"
+			"\t|  6   |      8       |    7     |\n"
 			"\t+--------------------------------+\n"
 			"\n"
 			"\n"
@@ -1055,7 +1063,7 @@ static void print_time_help(void)
 			"\t|      | Upto but not | reported |\n"
 			"\t| From |  including   | seconds  |\n"
 			"\t|------+--------------+----------|\n"
-			"\t|  0   |      1       |    0     |\n"
+			"\t|  0.4 |      1       |    0     |\n"
 			"\t|  1   |      2       |    1     |\n"
 			"\t|  2   |      3       |    2     |\n"
 			"\t|  3   |      4       |    3     |\n"
@@ -1067,9 +1075,9 @@ static void print_time_help(void)
 			"\t|      | Upto but not | reported |\n"
 			"\t| From |  including   | seconds  |\n"
 			"\t|------+--------------+----------|\n"
-			"\t|  0   |     1.5      |    1     |\n"
-			"\t|  1.5 |     3.5      |    3     |\n"
+			"\t|  0.4 |     3.5      |    3     |\n"
 			"\t|  3.5 |     5.5      |    5     |\n"
+			"\t|  5.5 |     7.5      |    7     |\n"
 			"\t+--------------------------------+\n"
 			"\n"
 			"\n"
@@ -1078,7 +1086,7 @@ static void print_time_help(void)
 			"\t|      | Upto but not | reported |\n"
 			"\t| From |  including   | seconds  |\n"
 			"\t|------+--------------+----------|\n"
-			"\t|  0   |     0.5      |    0     |\n"
+			"\t|  0.4 |     0.5      |    0     |\n"
 			"\t|  0.5 |     1.5      |    1     |\n"
 			"\t|  1.5 |     2.5      |    2     |\n"
 			"\t|  2.5 |     3.5      |    3     |\n"
