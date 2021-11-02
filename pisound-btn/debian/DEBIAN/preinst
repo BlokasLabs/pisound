@@ -4,4 +4,3 @@ if [ -e /etc/pisound.conf ]; then
 	cp /etc/pisound.conf /etc/pisound.conf.bak.`date +"%F.%T"`
 fi
 
-dpkg-divert --package pisound-btn --add --rename --divert /etc/default/hostapd.orig /etc/default/hostapd
