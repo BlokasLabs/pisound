@@ -18,14 +18,14 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
 
-. /usr/local/pisound/scripts/common/common.sh
+SCRIPTS_PATH="/usr/local/pisound/scripts"
+
+. ${SCRIPTS_PATH}/common/common.sh
 
 log "Toggling WiFi hotspot!"
 
-if systemctl is-active --quiet wifi-hotspot; then
-	systemctl stop wifi-hotspot
-	systemctl disable wifi-hotspot
+if systemctl is-active wifi-hotspot --quiet; then
+	${SCRIPTS_PATH}/pisound-btn/disable_wifi_hotspot.sh
 else
-	systemctl enable wifi-hotspot
-	systemctl start wifi-hotspot
+	${SCRIPTS_PATH}/pisound-btn/enable_wifi_hotspot.sh
 fi

@@ -26,6 +26,10 @@ pisound-btn: pisound-btn.c
 	gcc pisound-btn.c -o pisound-btn
 	strip pisound-btn
 
+test: test.c
+	gcc test.c -o test
+	strip test
+	
 $(PISOUND_DIR):
 	@if [ ! -d $(PISOUND_DIR) ]; then \
 		echo 'Copying this git repository to $(PISOUND_DIR)'; \

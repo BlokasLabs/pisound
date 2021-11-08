@@ -37,7 +37,7 @@
 #define HOMEPAGE_URL "https://blokas.io/pisound/"
 #define UPDATE_URL   HOMEPAGE_URL "/updates?btnv=%x.%02x&v=%s&sn=%s&id=%s"
 
-enum { PISOUND_BTN_VERSION     = 0x0113 };
+enum { PISOUND_BTN_VERSION     = 0x0115 };
 enum { INVALID_VERSION         = 0xffff };
 enum { CLICK_TIMEOUT_MS        = 400    };
 enum { HOLD_PRESS_TIMEOUT_MS   = CLICK_TIMEOUT_MS };
@@ -105,9 +105,35 @@ static char g_config_path[MAX_PATH_LENGTH+1]  = "/etc/pisound.conf";
 #define ABSOLUTE_MAX_CLICK 99
 // printf( HOLD_%uS", ABSOLUTE_MAX_HOLD) must fit in ACTION_NAME_SIZE
 #define ABSOLUTE_MAX_HOLD 99
-// convert ticks to seconds so the [0,2) == 1, [2,4) == 3, [4,6) == 5
-#define TICK_2_SECONDS(x) (x/1000 + (x%2))
+// convert ticks to seconds based on global options g_full_time and g_centered_time
+#define TICK_2_SECONDS(x) seconds(x)
 
+
+static bool g_full_time = false;
+static bool g_offset_time = false;
+
+// converts ticks to seconds
+static int seconds( int ticks ) {
+
+	int result;
+
+	if (g_offset_time)  {
+		if (g_full_time) {  // f+o+
+			result = (ticks+500)/1000;
+
+		} else {		// f-o+
+			int sec = (ticks)/1000;
+			result = sec+((sec+1)%2);
+		}
+	} else {
+		if (g_full_time) { // f+o-
+			result = ticks/1000;
+		} else {		// f-o-
+			result = 1+( ((ticks-1000)/2000)* 2);
+		}
+	}
+	return result;
+}
 
 enum { DEFAULT_CLICK_COUNT_LIMIT = 8 };
 
@@ -1022,11 +1048,65 @@ static void print_usage(void)
 		"\t--debug <n>              Enable debugging at level n (higher value = more logging)\n"
 		"\t-n <n>                   Short for --click-count-limit.\n"
 		"\t-q                       Short for --debug 0 (turns off all but errors)\n"
+		"\t--full-time              Return both odd and even times in events.  Default is to only return odd second counts (--help-time for more details).\n"
+		"\t--offset-time            Offset the start and end times by 1/2 second (--help-time for more details).\n"
+		"\t--help-time              Explain the time options above.\n"
 		"\n"
 		);
 	print_version();
 }
 
+static void print_time_help(void)
+{
+	printf("Pisound only reports hold times if the button is held more than 0.4 seconds.\n"
+			"By default pisound-btn reports only odd seconds as follows:\n"
+			"\t+--------------------------------+\n"
+			"\t|      | Upto but not | reported |\n"
+			"\t| From |  including   | seconds  |\n"
+			"\t|------+--------------+----------|\n"
+			"\t|  0.4 |      3       |    1     |\n"
+			"\t|  3   |      5       |    3     |\n"
+			"\t|  5   |      7       |    5     |\n"
+			"\t+--------------------------------+\n"
+			"\n"
+			"\n"
+			"if --offset-time is specified the seconds are reported as:\n"
+			"\t+--------------------------------+\n"
+			"\t|      | Upto but not | reported |\n"
+			"\t| From |  including   | seconds  |\n"
+			"\t|------+--------------+----------|\n"
+			"\t|  0.4 |     2        |    1     |\n"
+			"\t|   2  |     4        |    3     |\n"
+			"\t|   4  |     6        |    5     |\n"
+			"\t|   6  |     8        |    7     |\n"
+			"\t+--------------------------------+\n"
+			"\n"
+			"\n"
+			"if --full-time is specified the seconds are reported as:\n"
+			"\t+--------------------------------+\n"
+			"\t|      | Upto but not | reported |\n"
+			"\t| From |  including   | seconds  |\n"
+			"\t|------+--------------+----------|\n"
+			"\t|  0.4 |      1       |    0     |\n"
+			"\t|  1   |      2       |    1     |\n"
+			"\t|  2   |      3       |    2     |\n"
+			"\t|  3   |      4       |    3     |\n"
+			"\t+--------------------------------+\n"
+			"\n"
+			"\n"
+			"if --full-time and --offset-time is specified the seconds are reported as:\n"
+			"\t+--------------------------------+\n"
+			"\t|      | Upto but not | reported |\n"
+			"\t| From |  including   | seconds  |\n"
+			"\t|------+--------------+----------|\n"
+			"\t|  0.4 |     0.5      |    0     |\n"
+			"\t|  0.5 |     1.5      |    1     |\n"
+			"\t|  1.5 |     2.5      |    2     |\n"
+			"\t|  2.5 |     3.5      |    3     |\n"
+			"\t+--------------------------------+\n"
+		"\n"
+		);
+}
 static bool parse_uint(unsigned int *dst, const char *src)
 {
 	char * endPtr;
@@ -1096,6 +1176,19 @@ int main(int argc, char **argv, char **envp)
 		else if (strcmp(argv[i], "--version") == 0)
 		{
 			print_version();
+			return 0;
+		}
+		else if (strcmp(argv[i], "--full-time") == 0)
+		{
+			g_full_time=true;
+		}
+		else if (strcmp(argv[i], "--offset-time") == 0)
+		{
+			g_offset_time=true;
+		}
+		else if (strcmp(argv[i], "--help-time") == 0)
+		{
+			print_time_help();
 			return 0;
 		}
 		else if (strcmp(argv[i], "--debug") == 0)
