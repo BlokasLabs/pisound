@@ -37,7 +37,7 @@
 #define HOMEPAGE_URL "https://blokas.io/pisound/"
 #define UPDATE_URL   HOMEPAGE_URL "/updates?btnv=%x.%02x&v=%s&sn=%s&id=%s"
 
-enum { PISOUND_BTN_VERSION     = 0x0114 };
+enum { PISOUND_BTN_VERSION     = 0x0115 };
 enum { INVALID_VERSION         = 0xffff };
 enum { CLICK_TIMEOUT_MS        = 400    };
 enum { HOLD_PRESS_TIMEOUT_MS   = CLICK_TIMEOUT_MS };
