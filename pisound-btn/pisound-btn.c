@@ -1,6 +1,6 @@
 /*
  * pisound-btn daemon for the Pisound button.
- * Copyright (C) 2017  Vilniaus Blokas UAB, https://blokas.io/pisound
+ * Copyright (C) 2017-2024  Vilniaus Blokas UAB, https://blokas.io/pisound/
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -19,9 +19,7 @@
 
 #include <stdarg.h>
 #include <stdio.h>
-#include <stdbool.h>
 #include <stdint.h>
-#include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/timerfd.h>
 #include <fcntl.h>
@@ -30,14 +28,14 @@
 #include <string.h>
 #include <poll.h>
 #include <time.h>
-#include <assert.h>
 #include <signal.h>
 #include <libgen.h>
+#include <gpiod.h>
 
 #define HOMEPAGE_URL "https://blokas.io/pisound/"
-#define UPDATE_URL   HOMEPAGE_URL "/updates?btnv=%x.%02x&v=%s&sn=%s&id=%s"
+#define UPDATE_URL   HOMEPAGE_URL "updates/?btnv=%x.%02x&v=%s&sn=%s&id=%s"
 
-enum { PISOUND_BTN_VERSION     = 0x0115 };
+enum { PISOUND_BTN_VERSION     = 0x0116 };
 enum { INVALID_VERSION         = 0xffff };
 enum { CLICK_TIMEOUT_MS        = 400    };
 enum { HOLD_PRESS_TIMEOUT_MS   = CLICK_TIMEOUT_MS };
@@ -52,10 +50,20 @@ enum PinActivation
 	PA_ACTIVE_HIGH = 2
 };
 
+struct gpio_pin_t
+{
+	struct gpiod_line *line;
+	int               fd;
+	int               offset;
+	int               events;
+	bool              exported;
+};
+
+struct gpiod_chip *g_chip = NULL;
+struct gpio_pin_t g_pin;
 static int g_button_pin = 17;
-static enum PinActivation g_pin_activation = PA_UNSPECIFIED;
+static enum PinActivation g_pin_activation = PA_ACTIVE_LOW;
 static bool g_use_default = true;
-static bool g_button_exported = false;
 
 enum action_e
 {
@@ -506,7 +514,7 @@ static void execute_action(enum action_e action, unsigned click_count, unsigned 
 
 static int gpio_is_pin_valid(int pin)
 {
-	return pin >= 0 && pin < 100;
+	return pin >= 0;
 }
 
 enum edge_e
@@ -515,6 +523,13 @@ enum edge_e
 	E_RISING  = 1,
 	E_FALLING = 2,
 	E_BOTH    = 3,
+};
+
+enum pull_e
+{
+	P_NONE = 0,
+	P_UP   = 1,
+	P_DOWN = 2,
 };
 
 // Returns negative value on error, 0 if the pin is already exported, 1 if pin was just exported successfully.
@@ -535,25 +550,20 @@ static int gpio_export(int pin)
 	{
 		int fd = open("/sys/class/gpio/export", O_WRONLY);
 		if (fd == -1)
-		{
-			fprintf(stderr, "Failed top open /sys/class/gpio/export!\n");
 			return -1;
-		}
-		char str_pin[4];
-		snprintf(str_pin, 3, "%d", pin);
-		str_pin[3] = '\0';
+		char str_pin[16];
+		snprintf(str_pin, 16, "%d", pin);
+		str_pin[15] = '\0';
 		const int n = strlen(str_pin)+1;
 		int result = write(fd, str_pin, n);
 		if (result != n)
 		{
-			fprintf(stderr, "Failed writing to /sys/class/gpio/export! Error %d.\n",  errno);
 			close(fd);
 			return -1;
 		}
 		result = close(fd);
 		if (result != 0)
 		{
-			fprintf(stderr, "Failed closing /sys/class/gpio/export! Error %d.\n", errno);
 			return -1;
 		}
 		// Give some time for the pin to appear.
@@ -583,12 +593,12 @@ static int gpio_unexport(int pin)
 		int fd = open("/sys/class/gpio/unexport", O_WRONLY);
 		if (fd == -1)
 		{
-			fprintf(stderr, "Failed top open /sys/class/gpio/unexport!\n");
+			fprintf(stderr, "Failed to open /sys/class/gpio/unexport!\n");
 			return -1;
 		}
-		char str_pin[4];
-		snprintf(str_pin, 3, "%d", pin);
-		str_pin[3] = '\0';
+		char str_pin[16];
+		snprintf(str_pin, 16, "%d", pin);
+		str_pin[15] = '\0';
 		const int n = strlen(str_pin)+1;
 		int result = write(fd, str_pin, n);
 		if (result != n)
@@ -761,7 +771,7 @@ static void check_for_updates(unsigned short btn_version, const char *version, c
 		return;
 
 	char cmd[1024];
-	if (snprintf(cmd, sizeof(cmd), "sleep 30 && wget \"%s\" -O - > /dev/null 2>&1 &", url) < 0)
+	if (snprintf(cmd, sizeof(cmd), "sleep 30 && curl \"%s\" > /dev/null 2>&1 &", url) < 0)
 		return;
 
 	system(cmd);
@@ -850,6 +860,198 @@ static void onHold(unsigned num_presses, timestamp_ms_t time_held)
 	execute_action(A_HOLD, num_presses, time_held);
 }
 
+static struct gpiod_chip *open_rpi_gpiochip()
+{
+	static const char *const gpiochip_names[] = {
+		"pinctrl-rp1", "pinctrl-bcm2835", "pinctrl-bcm2711"
+	};
+
+	int i;
+	struct gpiod_chip *chip;
+	for (i=0; i<sizeof(gpiochip_names)/sizeof(*gpiochip_names); ++i)
+	{
+		chip = gpiod_chip_open_by_label(gpiochip_names[i]);
+		if (chip)
+			return chip;
+	}
+
+	// Fall back to searching for gpiochip via a known pin name.
+	struct gpiod_line *l = gpiod_line_find("ID_SD");
+	if (l)
+	{
+		chip = gpiod_line_get_chip(l);
+		return chip;
+	}
+
+	return NULL;
+}
+
+static void gpio_pin_close(struct gpio_pin_t *pin)
+{
+	if (!pin)
+		return;
+
+	if (pin->fd != -1)
+	{
+		close(pin->fd);
+		pin->fd = -1;
+	}
+
+	if (pin->line)
+	{
+		gpiod_line_release(pin->line);
+		pin->line = NULL;
+	}
+
+	if (pin->exported)
+	{
+		gpio_unexport(pin->offset);
+		pin->exported = false;
+	}
+
+	pin->offset = -1;
+}
+
+static int gpio_pin_open_input(struct gpio_pin_t *pin, int offset, enum edge_e edge, enum pull_e pull, const bool *active_low)
+{
+	struct gpio_pin_t p;
+	p.line = NULL;
+	p.fd = -1;
+	p.exported = false;
+	p.events = 0;
+	p.offset = offset;
+
+	// First attempt access via sysfs gpio class, otherwise, try libgpiod.
+	int err = gpio_export(offset);
+
+	if (err < 0) goto gpiod;
+	else p.exported = (err == 1);
+
+	if (active_low)
+	{
+		err = gpio_set_active_low(offset, *active_low);
+		if (err != 0)
+			goto cleanup;
+	}
+
+	err = gpio_set_edge(offset, edge);
+
+	if (err != 0)
+		goto cleanup;
+
+	p.fd = gpio_open(offset);
+	if (p.fd == -1)
+	{
+		err = errno;
+		goto cleanup;
+	}
+
+	p.events = POLLPRI;
+
+	goto success;
+
+gpiod:
+	if (!g_chip)
+	{
+		fprintf(stderr, "Won't attempt opening with libgpiod as the gpiochip was not found!\n");
+		return ENOENT;
+	}
+
+	p.line = gpiod_chip_get_line(g_chip, offset);
+
+	if (!p.line)
+	{
+		fprintf(stderr, "GPIO %d couldn't be found!\n", offset);
+		err = ENOENT;
+		goto cleanup;
+	}
+
+	const char *consumer = "pisound-btn";
+	int flags = 0;
+	if (active_low)
+		flags |= *active_low ? GPIOD_LINE_REQUEST_FLAG_ACTIVE_LOW : 0;
+
+	switch (pull)
+	{
+	default:
+	case P_NONE:
+		flags |= GPIOD_LINE_REQUEST_FLAG_BIAS_DISABLE;
+		break;
+	case P_UP:
+		flags |= GPIOD_LINE_REQUEST_FLAG_BIAS_PULL_UP;
+		break;
+	case P_DOWN:
+		flags |= GPIOD_LINE_REQUEST_FLAG_BIAS_PULL_DOWN;
+		break;
+	}
+
+	switch (edge)
+	{
+	case E_RISING:
+		err = gpiod_line_request_rising_edge_events_flags(p.line, consumer, flags);
+		break;
+	case E_FALLING:
+		err = gpiod_line_request_falling_edge_events_flags(p.line, consumer, flags);
+		break;	
+	case E_BOTH:
+		err = gpiod_line_request_both_edges_events_flags(p.line, consumer, flags);
+		break;
+	case E_NONE:
+		break;
+	}
+
+	if (err == -1)
+	{
+		fprintf(stderr, "%u line request for edge events failed!\n", offset);
+		err = errno;
+		goto cleanup;
+	}
+
+	p.fd = gpiod_line_event_get_fd(p.line);
+	p.events = POLLIN | POLLPRI;
+
+	goto success;
+
+success:
+	memcpy(pin, &p, sizeof(p));
+	return 0;
+
+cleanup:
+	gpio_pin_close(&p);
+	return err;
+}
+
+static int gpio_pin_read(struct gpio_pin_t *pin)
+{
+	if (pin->fd == -1)
+		return -EINVAL;
+	if (pin->line)
+	{
+		struct gpiod_line_event ev;
+		gpiod_line_event_read_fd(pin->fd, &ev);
+		return ev.event_type == GPIOD_LINE_EVENT_RISING_EDGE;
+	}
+	else
+	{
+		char buff[16];
+		memset(buff, 0, sizeof(buff));
+		int n = read(pin->fd, buff, sizeof(buff));
+		if (n == 0)
+		{
+			fprintf(stderr, "Reading pin value returned 0.\n");
+			return -EINVAL;
+		}
+
+		if (lseek(pin->fd, SEEK_SET, 0) == -1)
+		{
+			fprintf(stderr, "Rewinding pin failed. Error %d.\n", errno);
+			return -EINVAL;
+		}
+
+		return strtoul(buff, NULL, 10);
+	}
+}
+
 static int run(void)
 {
 	char version_string[64];
@@ -879,25 +1081,17 @@ static int run(void)
 	if ((version < 0x0100 || version >= 0x0200) && version != INVALID_VERSION)
 	{
 		fprintf(stderr, "The kernel module version (%04x) and pisound-btn version (%04x) are incompatible! Please check for updates at " HOMEPAGE_URL "\n", version, PISOUND_BTN_VERSION);
-		return -EINVAL;
+		return EINVAL;
 	}
 
-	int err = gpio_export(g_button_pin);
-
-	if (err < 0) return err;
-	else g_button_exported = (err == 1);
-
-	if (g_pin_activation == PA_ACTIVE_LOW || g_pin_activation == PA_ACTIVE_HIGH)
-	{
-		err = gpio_set_active_low(g_button_pin, g_pin_activation == PA_ACTIVE_LOW);
-		if (err != 0)
-			return err;
-	}
-
-	err = gpio_set_edge(g_button_pin, E_BOTH);
+	bool active_low = g_pin_activation == PA_ACTIVE_LOW;
+	int err = gpio_pin_open_input(&g_pin, g_button_pin, E_BOTH, P_UP, g_pin_activation != PA_UNSPECIFIED ? &active_low : NULL);
 
 	if (err != 0)
+	{
+		fprintf(stderr, "Failed opening pin input! (%d)\n", err);
 		return err;
+	}
 
 	enum
 	{
@@ -906,24 +1100,20 @@ static int run(void)
 		FD_COUNT
 	};
 
-	int btnfd = gpio_open(g_button_pin);
-	if (btnfd == -1)
-		return errno;
-
 	int timerfd = timerfd_create(CLOCK_MONOTONIC, 0);
 	if (timerfd == -1)
 	{
 		fprintf(stderr, "Creating timer failed. Error %d.\n", errno);
-		gpio_close(btnfd);
+		gpio_pin_close(&g_pin);
 		return errno;
 	}
 
-	printf("Listening to events on GPIO #%d\n", g_button_pin);
+	printf("Listening to events on GPIO line %u.\n", g_button_pin);
 
 	struct pollfd pfd[FD_COUNT];
 
-	pfd[FD_BUTTON].fd = btnfd;
-	pfd[FD_BUTTON].events = POLLPRI;
+	pfd[FD_BUTTON].fd = g_pin.fd;
+	pfd[FD_BUTTON].events = g_pin.events;
 
 	pfd[FD_TIMER].fd = timerfd;
 	pfd[FD_TIMER].events = POLLIN;
@@ -944,26 +1134,11 @@ static int run(void)
 		if (result == 0)
 			continue;
 
-		if (pfd[FD_BUTTON].revents & POLLPRI) // Button state changed.
+		if (pfd[FD_BUTTON].revents) // Button state changed.
 		{
 			timestamp_ms_t timestamp = get_timestamp_ms();
 
-			char buff[16];
-			memset(buff, 0, sizeof(buff));
-			int n = read(btnfd, buff, sizeof(buff));
-			if (n == 0)
-			{
-				fprintf(stderr, "Reading button value returned 0.\n");
-				break;
-			}
-
-			if (lseek(btnfd, SEEK_SET, 0) == -1)
-			{
-				fprintf(stderr, "Rewinding button failed. Error %d.\n", errno);
-				break;
-			}
-
-			unsigned long pressed = strtoul(buff, NULL, 10);
+			unsigned long pressed = gpio_pin_read(&g_pin) > 0;
 
 			if (pressed)
 			{
@@ -1021,15 +1196,13 @@ static int run(void)
 	}
 
 	close(timerfd);
-	gpio_close(btnfd);
-
-	gpio_set_edge(g_button_pin, E_NONE);
+	gpio_pin_close(&g_pin);
 	return 0;
 }
 
 static void print_version(void)
 {
-	printf("Version %x.%02x, Blokas Labs " HOMEPAGE_URL "\n", PISOUND_BTN_VERSION >> 8, PISOUND_BTN_VERSION & 0xff);
+	printf("Version %x.%02x, (c) Blokas, " HOMEPAGE_URL "\n", PISOUND_BTN_VERSION >> 8, PISOUND_BTN_VERSION & 0xff);
 }
 
 static void print_usage(void)
@@ -1038,7 +1211,7 @@ static void print_usage(void)
 		"Options:\n"
 		"\t--help                   Display the usage information.\n"
 		"\t--version                Show the version information.\n"
-		"\t--gpio <n>               The pin GPIO number to use for the button. Default is 17.\n"
+		"\t--gpio <line_id>         The GPIO line id of RPi GPIO header to use for the button. Default is 17 (PIN11). Use `gpioinfo` to list available pins.\n"
 		"\t--active-high            Configure the pin for active high triggering.\n"
 		"\t--active-low             Reverse the sense of the active state.\n"
 		"\t                         If none of --active-high or --active-low is specified, this GPIO setting is left as is.\n"
@@ -1143,11 +1316,7 @@ static bool read_config_uint(const char *conf, const char *value_name, unsigned 
 
 static void cleanup(void)
 {
-	if (g_button_exported)
-	{
-		gpio_unexport(g_button_pin);
-		g_button_exported = false;
-	}
+	gpio_pin_close(&g_pin);
 }
 
 static void sigint_handler(int signum)
@@ -1316,5 +1485,12 @@ int main(int argc, char **argv, char **envp)
 		read_config_uint(g_config_path, CLICK_COUNT_LIMIT_VALUE_NAME, &g_click_count_limit, g_click_count_limit);
 	}
 
-	return run();
+	g_chip = open_rpi_gpiochip();
+
+	int ret = run();
+
+	if (g_chip)
+		gpiod_chip_close(g_chip);
+
+	return ret;
 }
