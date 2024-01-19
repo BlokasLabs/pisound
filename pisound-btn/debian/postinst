@@ -1,10 +1,9 @@
-systemctl daemon-reload
 if [ ! -d "/usr/local/pisound" ]; then
 	echo "Cloning pisound repository from https://github.com/BlokasLabs/pisound..."
 	git clone https://github.com/BlokasLabs/pisound.git /usr/local/pisound
 else
 	echo "Updating pisound repository with latest stuff in https://github.com/BlokasLabs/pisound..."
-	cd /usr/local/pisound && git -c user.name="apt-get" -c user.email="apt@get" stash && git pull --no-rebase
+	cd /usr/local/pisound && git -c user.name="apt-get" -c user.email="apt@get" stash && git -c user.name="apt-get" -c user.email="apt@get" pull --rebase
 fi
 
 if [ -e "/usr/local/bin/pisound-btn" ]; then
@@ -12,19 +11,7 @@ if [ -e "/usr/local/bin/pisound-btn" ]; then
 	rm -f "/usr/local/bin/pisound-btn"
 fi
 
-if [ -e "/etc/systemd/system/pisound-btn.service" ]; then
-	echo "Deleting /etc/systemd/system/pisound-btn.service from 1.04"
-	systemctl stop pisound-btn
-	systemctl disable pisound-btn
-	rm -f "/etc/systemd/system/pisound-btn.service"
-fi
-
-# Automatically added by dh_installinit
-if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ]; then
-	systemctl enable pisound-btn
-	systemctl start pisound-btn
-fi
-# End automatically added section
+#DEBHELPER#
 
 if [ -e /etc/pisound.conf ] || [ -L /etc/pisound.conf ]; then
 	if [ ! -L /etc/pisound.conf ]; then

@@ -6,6 +6,8 @@ After=sound.target
 EnvironmentFile=/etc/environment
 Environment=HOME=/root
 ExecStart=/usr/local/bin/pisound-btn
+KillSignal=SIGINT
+KillMode=process
 
 [Install]
 WantedBy=multi-user.target

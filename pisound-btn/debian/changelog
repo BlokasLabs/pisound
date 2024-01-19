@@ -1,3 +1,9 @@
+pisound-btn (1.16-1) UNRELEASED; urgency=low
+
+  * Made compatible with Raspberry Pi 5.
+
+ -- Giedrius Trainavičius <giedrius@blokas.io>  Fri, 19 Jan 2024 09:42:35 +0000
+
 pisound-btn (1.08-1) jessie; urgency=medium
 
   * Allow setting path to button config via PISOUND_BTN_CFG environment variable.
@@ -41,4 +47,3 @@ pisound-btn (1.05-1) jessie; urgency=medium
   * Initial pisound-btn as deb package release.
 
  -- Giedrius Trainavičius <giedrius@blokas.io>  Wed, 11 Oct 2017 23:58:07 +0200
-
