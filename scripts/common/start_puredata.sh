@@ -69,7 +69,7 @@ start_puredata()
 	shift
 
 	log "Launching Pure Data."
-	cd "$PATCH_DIR" && puredata -stderr -alsa -audioadddev pisound -alsamidi -channels 2 -r 48000 $NO_GUI -mididev 1 -send ";pd dsp 1" "$PATCH" $@ &
+	cd "$PATCH_DIR" && puredata -stderr -alsa $(/usr/local/pisound/scripts/common/find_pd_alsa_devices.py "pisound (hardware)") -alsamidi -channels 2 -r 48000 $NO_GUI -mididev 1 -send ";pd dsp 1" "$PATCH" $@ &
 	PD_PID=$!
 
 	log "Pure Data started!"
