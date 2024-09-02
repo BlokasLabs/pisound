@@ -24,7 +24,7 @@
 
 log "Searching for main.pd in USB storage!"
 
-PURE_DATA_PATCH=`find /media 2> /dev/null | grep main.pd | head -1`
+PURE_DATA_PATCH=`find /media 2> /dev/null | grep /main.pd | head -1`
 
 if [ -z "$PURE_DATA_PATCH" ]; then
 	log "No patch found in attached media, trying to mount USB devices..."
@@ -46,11 +46,11 @@ if [ -z "$PURE_DATA_PATCH" ]; then
 		sudo mount "$DEV" "$MEDIAPATH"
 	done
 
-	PURE_DATA_PATCH=`find /media 2> /dev/null | grep main.pd | head -1`
+	PURE_DATA_PATCH=`find /media 2> /dev/null | grep /main.pd | head -1`
 
 	if [ -z "$PURE_DATA_PATCH" ]; then
 		log "No patch found in attached media, checking /usr/local/puredata-patches..."
-		PURE_DATA_PATCH=`find /usr/local/puredata-patches/ 2> /dev/null | grep main.pd | head -1`
+		PURE_DATA_PATCH=`find /usr/local/puredata-patches/ 2> /dev/null | grep /main.pd | head -1`
 	fi
 fi
 
