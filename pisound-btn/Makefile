@@ -16,7 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
 
-VERSION=1.16
+VERSION=1.17
 
 PREFIX?=/usr/local
 
@@ -28,14 +28,20 @@ INSTALL?=install
 INSTALL_PROGRAM?=$(INSTALL)
 INSTALL_DATA?=$(INSTALL) -m 644
 
+LIBGPIOD_PKG?=libgpiod
+GPIOD_GE_2 := $(shell pkg-config --atleast-version=2.0.0 $(LIBGPIOD_PKG) && echo 1 || echo 0)
+GPIOD_CFLAGS := $(if $(GPIOD_GE_2),-DLIBGPIOD2=1,-DLIBGPIOD1=1)
+
+CFLAGS += $(GPIOD_CFLAGS)
+
 all: pisound-btn
 
 pisound-btn: pisound-btn.c
-	gcc pisound-btn.c -lgpiod -o pisound-btn
+	gcc $(CFLAGS) pisound-btn.c -lgpiod -o pisound-btn
 	strip pisound-btn
 
 test: test.c
-	gcc test.c -o test
+	gcc $(CFLAGS) test.c -o test
 	strip test
 
 $(PISOUND_DIR):
