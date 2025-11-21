@@ -32,7 +32,7 @@ snd_soc_pisound-y := pisound.o
 dtbo-y += pisound.dtbo
 DTC_FLAGS ?= -@
 
-always := $(dtbo-y)
+always-y := $(dtbo-y)
 
 all:
 	$(MAKE) -C $(KERNEL_DIR) M=$(PWD) modules

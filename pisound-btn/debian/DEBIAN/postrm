@@ -1,9 +1,0 @@
-# In case this system is running systemd, we make systemd reload the unit files
-# to pick up changes.
-if [ -d /run/systemd/system ] ; then
-	systemctl --system daemon-reload >/dev/null || true
-fi
-
-if [ "$1" = "remove" ]; then
-	dpkg-divert --package pisound-btn --remove --rename /etc/default/hostapd
-fi

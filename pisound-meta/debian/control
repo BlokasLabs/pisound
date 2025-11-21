@@ -1,0 +1,15 @@
+Source: pisound
+Section: sound
+Priority: optional
+Maintainer: Blokas <hello@blokas.io>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.5.1
+Homepage: https://blokas.io/pisound/
+
+Package: pisound
+Architecture: all
+Description: Pisound meta package. 
+ Combines individual Pisound packages under single name.
+Depends: ${misc:Depends}, pisound-btn (>= 1.17-1), pisound-ctl (>= 1.03-11), blokas-telemetry (>= 1.0.1-2)
+Priority: optional
+Multi-Arch: foreign

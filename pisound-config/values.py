@@ -87,23 +87,18 @@ def update_btn_config(param, value):
 
 def get_hs_config():
     items = []
-    with open(settings.HS_CFG, 'r') as f:
-        for line in f:
-            for p in ['ssid', 'wpa_passphrase', 'channel']:
-                if line.startswith(p):
-                    param = line.strip().split('=')
-                    items.append({'title': param[0] + ': ' + param[1], 'key': param[0], 'value': param[1]})
+    lines = subprocess.check_output(
+        ['nmcli', '-s', 'c', 'show', 'pb-hotspot']).decode('utf-8')
+    for line in lines.splitlines():
+        for p in ['802-11-wireless.ssid:', '802-11-wireless-security.psk:']:
+            if line.startswith(p):
+                param = line.strip().split(':')
+                items.append(
+                    {'title': p + ': ' + param[1].strip(), 'key': param[0], 'value': param[1].strip()})
     return items
 
 def update_hs_config(param, value):
-    with open(settings.HS_CFG, 'r') as f:
-        data = f.readlines()
-        for i, line in enumerate(data):
-            if line.startswith(param):
-                data[i] = param + '=' + value + '\n'
-                break
-    with open(settings.HS_CFG, 'w') as f:
-        f.writelines(data)
+    ec = subprocess.call(['nmcli', 'c', 'mod', 'pb-hotspot', param, value])
 
 def get_serial():
     try:

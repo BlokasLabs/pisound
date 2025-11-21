@@ -78,7 +78,7 @@ def btn_update_silent(button, selection):
 
 def hs_menu(button, *selection):
     title = 'Pisound Hotspot Settings'
-    description = 'Here you can change Pisound Hotspot name, password and channel.'
+    description = 'Here you can change Pisound Hotspot name and password.'
     items = values.get_hs_config()
     callback = hs_param_menu
     parent = main_menu
@@ -96,7 +96,7 @@ def hs_update_silent(button, selection):
         hs_menu(selection)
     else:
         values.update_hs_config(selection['key'], selection['new_value'])
-        hs_restart_message(selection)
+        hs_restart_message(selection['key'])
 
 def toggle_rpi4_workaround(button, selection):
     values.set_rpi4_workaround_enabled(not values.is_rpi4_workaround_enabled())

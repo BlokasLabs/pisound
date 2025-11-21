@@ -1,0 +1,23 @@
+if [ ! -d "/usr/local/pisound" ]; then
+	echo "Cloning pisound repository from https://github.com/BlokasLabs/pisound..."
+	git clone https://github.com/BlokasLabs/pisound.git /usr/local/pisound
+else
+	echo "Updating pisound repository with latest stuff in https://github.com/BlokasLabs/pisound..."
+	cd /usr/local/pisound && git -c user.name="apt-get" -c user.email="apt@get" stash && git -c user.name="apt-get" -c user.email="apt@get" pull --rebase
+fi
+
+if [ -e "/usr/local/bin/pisound-btn" ]; then
+	echo "Deleting locally built pisound-btn, so that the packaged version is preferred."
+	rm -f "/usr/local/bin/pisound-btn"
+fi
+
+#DEBHELPER#
+
+if [ -e /etc/pisound.conf ] || [ -L /etc/pisound.conf ]; then
+	if [ ! -L /etc/pisound.conf ]; then
+		mv /etc/pisound.conf /usr/local/etc/pisound.conf.bak.`date +"%F.%T"`
+	else
+		unlink /etc/pisound.conf
+	fi
+fi
+ln -s /usr/local/etc/pisound.conf /etc/pisound.conf
