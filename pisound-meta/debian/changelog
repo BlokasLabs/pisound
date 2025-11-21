@@ -1,3 +1,9 @@
+pisound (1.06-2) UNRELEASED; urgency=low
+
+  * Trixie edition rebuild.
+
+ -- Giedrius Trainavičius <giedrius@blokas.io>  Thu, 20 Nov 2025 23:18:19 +0200
+
 pisound (1.06-1) UNRELEASED; urgency=low
 
   * Package versions updated.
